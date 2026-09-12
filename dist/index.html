@@ -7,13 +7,10 @@
 <section class="lobby-selection" aria-label="Play menu">
 <div class="eyebrow" id="sceneEyebrow">POWER BOXING</div><h1 id="sceneTitle">DEAD / AHEAD</h1><p id="gameDescription">Step into the ring. Make every punch count.</p>
 <button id="playGame" class="play-button"><span>PLAY</span><span aria-hidden="true">↗</span></button><p id="lobbyNotice" role="status">Connect your arm, or choose practice below.</p>
-<nav class="game-picker" aria-label="Choose a game">
-<button data-game="zombies" aria-pressed="false"><span class="game-number">01</span><span>Zombie Boxing<small>Power / Survival</small></span></button>
-<button data-game="bird" aria-pressed="false"><span class="game-number">02</span><span>Bird Flight<small>Flow / Explore</small></span></button>
-<button data-game="saber" aria-pressed="false"><span class="game-number">03</span><span>Neon Saber<small>Rhythm / Slice</small></span></button>
-<button data-game="sword" aria-pressed="false"><span class="game-number">04</span><span>Sword Arena<small>Combat / Endurance</small></span></button>
-<button data-game="shield" aria-pressed="false"><span class="game-number">05</span><span>Orbit Guard<small>Defense / React</small></span></button>
-<button data-game="targets" aria-pressed="false"><span class="game-number">06</span><span>Target Rush<small>Precision / Focus</small></span></button>
+<nav id="gamePicker" class="game-carousel" aria-label="Choose a game">
+<button id="previousGame" aria-label="Previous game" aria-controls="gameChoice"><span aria-hidden="true">‹</span></button>
+<div id="gameChoice" class="game-choice" aria-live="polite" aria-atomic="true"><strong id="selectedGameName">Zombie Boxing</strong><div><span id="selectedGameTag">POWER BOXING</span><span id="selectedGameNumber">01 / 06</span></div></div>
+<button id="nextGame" aria-label="Next game" aria-controls="gameChoice"><span aria-hidden="true">›</span></button>
 </nav>
 <div class="session-targets"><label>TIME TARGET<select id="workoutGoal"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="20">20 min</option><option value="30">30 min</option></select></label><label>CALORIE TARGET<select id="calorieGoal"><option value="25">25 kcal</option><option value="50" selected>50 kcal</option><option value="100">100 kcal</option><option value="200">200 kcal</option></select></label></div>
 <div class="control-choice"><label for="gameInput">CONTROLS</label><select id="gameInput"><option value="live">Connected arm</option><option value="practice">Practice · keyboard / touch</option></select></div>

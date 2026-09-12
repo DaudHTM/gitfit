@@ -8,6 +8,7 @@ import {createWorldDetails} from './world-details.js';
 import {createAvatar,createLobbyAvatar} from './avatar.js';
 import {createBoxingModels} from './boxing-models.js';
 const $=id=>document.getElementById(id);
+const GAME_ORDER=['zombies','bird','saber','sword','shield','targets'];
 export function createArcade(renderer,getTracking){
  const scene=new T.Scene();scene.background=new T.Color('#0b1018');scene.fog=new T.FogExp2('#0b1018',.075);
  const camera=new T.PerspectiveCamera(66,1,.03,50);camera.position.set(.34,2.06,.80);camera.lookAt(.10,1.22,-2.3);
@@ -70,14 +71,16 @@ export function createArcade(renderer,getTracking){
  if(state!=='paused'){clear();elapsed=0;nextSpawn=2.5;kills=hits=targetScore=0;lives=5;wave=1;extra.reset(mode);extraResult=null;if(mode==='zombies')zombie(-2.1,0);else if(mode==='targets')practiceTarget();}
  detector.reset();practiceStart=-10000;extra.group.visible=!['zombies','targets'].includes(mode);state='playing';$('viewport').focus({preventScroll:true});sound.play('bell');$('gameOverlay').hidden=true;$('pauseGame').disabled=false;$('pauseGame').textContent='Pause';}
  function select(next){sound.stop();mode=next;world.select(next);boxing.environment.visible=next==='zombies';$('opponentHud').hidden=true;arena.visible=['saber','shield'].includes(next);strikeZone.visible=next==='saber';street.visible=!['bird','zombies','sword'].includes(next);sky.visible=next==='bird';scene.background.set(next==='bird'?'#9fcbd0':'#0b1018');scene.fog.color.copy(scene.background);scene.fog.density=next==='bird'?.025:.075;extra.reset(next);extraResult=null;player.visible=next!=='bird';active=false;state='menu';clear();elapsed=0;hits=kills=targetScore=0;lives=5;wave=1;document.body.classList.toggle('arcade-active',active);$('gameHud').hidden=!active;$('gameOverlay').hidden=!active;$('gameToolbar').hidden=!active;document.body.classList.remove('in-game');
- document.querySelectorAll('[data-game]').forEach(b=>{b.classList.toggle('selected',b.dataset.game===next);b.setAttribute('aria-pressed',String(b.dataset.game===next));});
+ const index=GAME_ORDER.indexOf(next);$('selectedGameName').textContent=GAMES[next].name;$('selectedGameTag').textContent=GAMES[next].tag;$('selectedGameNumber').textContent=`${String(index+1).padStart(2,'0')} / ${String(GAME_ORDER.length).padStart(2,'0')}`;
  const g=GAMES[next];$('sceneTitle').textContent=g.title;$('sceneEyebrow').textContent=g.tag;$('gameDescription').textContent=g.intro;$('sceneNote').textContent=next==='bird'?'FLAP DOWN TO LIFT · ANGLE YOUR STROKES TO STEER':'RIGHT ARM TRACKED';
  $('lobbyNotice').textContent=input==='practice'?'Practice mode · Space to move · no calories counted':liveReady()?'Your arm is ready. Let’s play.':'Connect your arm, or choose practice below.';
  $('practicePunch').textContent=next==='bird'?'Flap · Space':'Strike · Space';$('punchOptions').hidden=input!=='practice';$('punchStyleLabel').hidden=!['zombies','targets'].includes(next);$('strikeReadout').hidden=!['zombies','targets'].includes(next);$('immersiveAction').textContent=next==='bird'?'Flap':'Strike';$('overlayTip').textContent=g.introHelp||g.help;
  camera.position.set(next==='bird'?3:3.3,next==='bird'?3:2.2,next==='bird'?5:5.4);cameraAim.set(0,next==='bird'?2:1.1,-3);camera.fov=57;
  $('pauseGame').disabled=true;
  }
- document.querySelectorAll('[data-game]').forEach(b=>b.onclick=()=>select(b.dataset.game));
+ function changeGame(direction){if(active)return;const index=GAME_ORDER.indexOf(mode);select(GAME_ORDER[(index+direction+GAME_ORDER.length)%GAME_ORDER.length]);}
+ $('previousGame').onclick=()=>changeGame(-1);$('nextGame').onclick=()=>changeGame(1);
+ $('gamePicker').addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();changeGame(e.key==='ArrowLeft'?-1:1);}});
  $('playGame').onclick=$('startGame').onclick=start;
  function lobby(){if(state==='playing'||state==='paused')finish();fullscreen.exit();select(mode);$('playGame').focus();}
  $('backLobby').onclick=$('overlayLobby').onclick=lobby;

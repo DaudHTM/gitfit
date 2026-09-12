@@ -20,3 +20,7 @@ Verification:
 - No browser console errors. Actual ESP32 connection and physical wearable calibration were not performed; the new firmware was compiled, not flashed.
 
 Publishing remains blocked because the existing Sites project returns NOT_FOUND for the current account/workspace. No replacement Site was created. The updated app is available in the retained local preview.
+
+## Single-game selector follow-up
+
+Replaced the six-button grid with one game name, category and position counter between Previous/Next buttons. Verified all six choices in order, wrapping in both directions, keyboard navigation, and matching scene titles. The same selection function continues to update the 3D world and launch the selected game. Desktop and mobile layout checked; no new runtime errors.
