@@ -4,7 +4,7 @@ Three.js viewer + ESP32 firmware, with BLE notifications and stationary pose cal
 
 ## Motion Arcade
 
-The home page now has **Zombie Boxing**, **Target Rush**, and the original **Motion Lab**. Connection and calibration are shared across modes; switching games keeps the BLE connection. Existing firmware/protocol is unchanged.
+The home page now has **Zombie Boxing**, **Target Rush**, and the original **Motion Lab**. Connection and calibration are shared across modes; switching games keeps the BLE connection. The arm protocol is unchanged; the optional heart-rate characteristic adds live BPM.
 
 - Zombie Boxing: enemies approach from ahead; two distinct right-arm punches defeat each one. Five health points, increasing waves, and 100 points per knockout. Enemies in reach attack every 2.3 seconds if not hit.
 - Target Rush: hit as many illuminated targets as possible in 45 seconds.
@@ -13,6 +13,38 @@ The home page now has **Zombie Boxing**, **Target Rush**, and the original **Mot
 - Escape or Pause freezes a round. Stale/invalid tracking and hidden tabs automatically pause live play; press Resume after recovery. Switching mode or input starts a new round.
 
 Punch detection derives wrist motion from the two tracked segment orientations, uses a swept collision test, and requires outward velocity plus retraction between hits. It is a game heuristic, not a measured punching force. Keep space around you and use controlled movements. Live hardware punch feel still needs testing with the actual wearable.
+
+## MAX30102 heart rate — 4 updates per second
+
+This firmware is based on your working pasted sketch: it preserves the `0x98` IMU identity allowance and startup calibration bypass. Your serial diagnostic blocks are retained behind `DEBUG_IMU = false`; enable that flag for troubleshooting. The bypass means the arm is marked calibrated without measured gyro bias until you explicitly calibrate.
+
+Install **SparkFun MAX3010x Pulse and Proximity Sensor Library** in Arduino Library Manager (by SparkFun, version 1.1.2). It supplies both `MAX30105.h` and `heartRate.h`; the MAX30105 class supports MAX30102 in red+IR mode. Keep **NimBLE-Arduino 2.x** installed (your machine has 2.5.1). Replace the entire old sketch with the downloaded `ArmTracker.ino`; do not append a second setup/loop. The explicit setup/loop declarations and multiline loop avoid the earlier declaration issue.
+
+Use these **additional** connections for a regulated GY-MAX30102 breakout, on a separate I²C controller:
+
+| ESP32 | GY-MAX30102 |
+|---|---|
+| GPIO25 | SDA |
+| GPIO26 | SCL |
+| GND | GND |
+| 3V3 | VIN/VCC **only if your breakout specifies 3.3 V input** |
+| No connection | INT |
+
+Leave both IMUs on GPIO21/22. MAX30102 address is 0x57. These pins target the original ESP32 DevKit/WROOM; change HEART_SDA/HEART_SCL for other boards. Use the module's labelled VIN, not a 1.8 V rail. Check your exact breakout's regulator and I²C level shifting; a bare MAX30102 needs separate 1.8 V and LED supplies and cannot use this breakout wiring directly. ESP32 I²C requires compatible 3.3 V logic. If your breakout's SDA/SCL pull-ups are 1.8 V, use an appropriate level shifter; never use 5 V pull-ups on ESP32 pins. Turn power off before wiring.
+
+The sensor task samples red/IR at **100 Hz** for beat detection, on its own bus. Heart-rate BLE notifications are **4 Hz** on a separate characteristic; the 20-byte, 100 Hz arm stream is unchanged. BPM is averaged over up to four accepted beat intervals, so 4 Hz display updates are not four newly measured beats per second. After applying your fingertip, allow roughly 5–10 seconds for filter settling and several beats. Hold the sensor gently against a stationary fingertip with consistent contact; the left/non-punching hand works best during boxing. Motion can create incorrect estimates even when a value is shown. This is an experimental BPM estimate, not SpO₂ or a medical measurement.
+
+The firmware rejects out-of-range/irregular intervals, expires old estimates, and retries an absent sensor every two seconds without stopping arm tracking. `FINGER_IR_MIN = 50000` is a starting threshold, not universal; adjust for your module and optical contact if it never detects a finger. Missing/no-contact/acquiring/stale states display a dash instead of 0 BPM. Refresh/reconnect after flashing; remove the browser's old Bluetooth permission or restart Bluetooth if the OS caches the previous GATT service. Old firmware without the new characteristic still works for motion but displays “Heart-rate firmware not available.”
+
+Heart characteristic: `8c310004-7a94-4b2d-b7bb-5de91f2d9a10` (notify).
+
+| Bytes | Meaning |
+|---|---|
+| 0 | Protocol version 1 |
+| 1 | bit0 sensor present, bit1 finger detected, bit2 estimate valid, bit3 sensor fault |
+| 2–3 | uint16 LE BPM × 10; zero when invalid |
+| 4–5 | uint16 LE milliseconds since accepted beat, saturating at 65535 |
+| 6–7 | uint16 LE heart notification sequence |
 
 ## Hardware and wiring
 
@@ -33,7 +65,7 @@ Bicep address is 0x68; forearm is 0x69. Leave INT, XDA and XCL disconnected. Pow
 
 1. Install Arduino IDE 2. Add `https://espressif.github.io/arduino-esp32/package_esp32_index.json` under Preferences → Additional Boards Manager URLs.
 2. In Boards Manager install **esp32 by Espressif Systems**, version 3.x. Select **ESP32 Dev Module** for a classic ESP32; select the actual serial port.
-3. Library Manager: install **NimBLE-Arduino by h2zero, version 2.3.6**. Wire is built in; no MPU library is needed. Firmware uses the NimBLE 2.x callbacks.
+3. Library Manager: install **NimBLE-Arduino by h2zero, version 2.5.1**. Wire is built in; no MPU library is needed. Also install the SparkFun MAX3010x library described above. Firmware uses the NimBLE 2.x callbacks.
 4. Open `firmware/ArmTracker/ArmTracker.ino`, upload, and open Serial Monitor at 115200 baud. If upload stalls, hold BOOT during connection and release once writing begins.
 5. Expect `MPU 0x68: OK`, `MPU 0x69: OK`, and `Ready`. A missing sensor halts startup; fix wiring and reset. An MPU at 0x69 still normally reports WHO_AM_I 0x68.
 
@@ -43,7 +75,7 @@ Use the **right arm**. Secure one sensor to the bicep and one to the forearm so 
 
 Stand upright, right arm straight down at your side, palm toward thigh. Connect, click **Calibrate pose**, and stay still for three seconds. Firmware checks acceleration magnitude, the expected gravity direction (approximately -1g on sensor X), gyro magnitude and variance for both sensors. Movement restarts the sample window; after 12 seconds the attempt fails. Rejected calibration requires another button press. If it repeatedly fails, check mounting axes, raw sensor behavior and motion. A constant slow rotation can evade stationary detection; actually hold still.
 
-Successful calibration stores gyro biases in RAM and resets both sensor-to-world quaternions to a shared reference. Moving the sensors, resetting the ESP32, significant temperature changes, or heading drift requires recalibration. Bias is not saved to flash. Wait for temperature to settle for best performance.
+The pasted firmware starts with calibration bypassed. When requested, successful calibration stores gyro biases in RAM and resets both sensor-to-world quaternions to a shared reference. Moving the sensors, resetting the ESP32, significant temperature changes, or heading drift requires recalibration. Bias is not saved to flash. Wait for temperature to settle for best performance.
 
 ## Browser and Bluetooth
 
@@ -85,9 +117,12 @@ Firmware sends reference-relative world rotations. Internal axes are X right, Y 
 
 ## Verification and dependencies
 
-`npm test` runs binary decoder and sequence-wrap tests; `npm run check` checks JavaScript syntax. Three.js is pinned to 0.180.0 through a CDN import map; first load needs internet. Google fonts are optional with local fallbacks. Firmware must be compiled/uploaded in your Arduino environment and hardware behavior must be tested on your actual boards; no physical devices were available during authoring.
+`npm test` runs binary decoder and sequence-wrap tests; `npm run check` checks JavaScript syntax. Three.js is pinned to 0.180.0 through a CDN import map; first load needs internet. Google fonts are optional with local fallbacks. The MAX30102 firmware compiled successfully for esp32:esp32:esp32 using Arduino-ESP32 3.3.11, NimBLE-Arduino 2.5.1, and SparkFun MAX3010x 1.1.2: 621300 bytes flash (47%), 37852 bytes static RAM (11%). Browser simulations verified valid BPM, no contact, stale readings, disconnects, and older firmware. Actual optical readings and motion performance still require testing on your boards; no hardware was flashed during authoring.
 
 ## Sources
+
+- [SparkFun MAX3010x library and MAX30102 compatibility](https://learn.sparkfun.com/tutorials/max30105-particle-and-pulse-ox-sensor-hookup-guide/using-the-sparkfun-max30105-arduino-library)
+- [MAX30102 supply and sensor specifications](https://www.analog.com/en/products/max30102.html)
 
 - [Espressif Arduino installation](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html)
 - [NimBLE-Arduino 2.3.6 server callbacks](https://github.com/h2zero/NimBLE-Arduino/blob/2.3.6/examples/NimBLE_Server/NimBLE_Server.ino)
