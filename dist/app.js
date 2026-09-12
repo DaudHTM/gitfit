@@ -20,6 +20,7 @@ function segment(group,length,radius,material){group.clear();const shell=new THR
 let upperLen=.3,lowerLen=.26;function dimensions(){upperLen=Math.min(50,Math.max(15,Number($('upperLength').value)||30))/100;lowerLen=Math.min(45,Math.max(15,Number($('lowerLength').value)||26))/100;segment(upper,upperLen,.051,lime);segment(lower,lowerLen,.042,teal)}dimensions();$('upperLength').onchange=dimensions;$('lowerLength').onchange=dimensions;
 const hand=new THREE.Mesh(new THREE.CapsuleGeometry(.033,.075,6,16),teal);scene.add(hand);
 const qu=new THREE.Quaternion(),qf=new THREE.Quaternion(),basis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2),basisInv=basis.clone().invert();
+const trackingSamples=[];let motionSequence=null,motionClock=0,motionArrival=0;
 let device=null,control=null,stream=null,busy=false,demo=false,last=0,seq=null,lost=0,count=0,rateStart=performance.now(),latestFlags=0,calPending=false,calDeadline=0,calCommand=0;
 function renderCalibration(flags,progress=0,reason=0){
  const v=calibrationView(flags,progress,calPending,reason);
@@ -33,9 +34,13 @@ function renderCalibration(flags,progress=0,reason=0){
 }
 function message(s){$('message').textContent=s;if(s.startsWith('Connection failed')||s.startsWith('Open this page'))$('setupDialog').showModal();}
 $('connectInSetup').onclick=()=>$('connect').click();
-function reset(){$('connectInSetup').textContent='Connect ESP32';control=null;stream=null;busy=false;last=0;seq=null;count=0;lost=0;latestFlags=0;calPending=false;$('connect').disabled=false;$('connect').textContent='Connect ESP32 ↗';$('connection').textContent='Disconnected';$('mode').textContent='PREVIEW';$('calibrate').disabled=true;renderCalibration(0);$('calStatus').textContent='Connect to begin two-pose calibration.';$('upperState').textContent=$('lowerState').textContent='Offline';$('rate').textContent=$('age').textContent=$('lost').textContent='—';$('demo').disabled=false;}
+function reset(){trackingSamples.length=0;motionSequence=null;motionArrival=0;$('connectInSetup').textContent='Connect ESP32';control=null;stream=null;busy=false;last=0;seq=null;count=0;lost=0;latestFlags=0;calPending=false;$('connect').disabled=false;$('connect').textContent='Connect ESP32 ↗';$('connection').textContent='Disconnected';$('mode').textContent='PREVIEW';$('calibrate').disabled=true;renderCalibration(0);$('calStatus').textContent='Connect to begin two-pose calibration.';$('upperState').textContent=$('lowerState').textContent='Offline';$('rate').textContent=$('age').textContent=$('lost').textContent='—';$('demo').disabled=false;}
 function receive(e){try{const p=decode(e.target.value);const now=performance.now();lost+=sequenceGap(seq,p.sequence);seq=p.sequence;last=now;count++;latestFlags=p.flags;
  for(const [i,q] of [qu,qf].entries()){const a=p.qs[i];q.set(a[1],a[2],a[3],a[0]).premultiply(basis).multiply(basisInv).normalize()}
+ const delta=motionSequence===null?0:(p.sequence-motionSequence+65536)%65536;
+ if(delta===0||delta>15||now-motionArrival>250){motionClock+=1000;trackingSamples.length=0;}else motionClock+=delta*10;
+ motionSequence=p.sequence;motionArrival=now;
+ if((p.flags&1)&&!(p.flags&6)){trackingSamples.push({qu:qu.clone(),qf:qf.clone(),time:motionClock});if(trackingSamples.length>32)trackingSamples.shift();}else trackingSamples.length=0;
  const calibrating=!!(p.flags&2),ready=!!(p.flags&1),fault=!!(p.flags&4);
  if(calPending&&((calCommand===1&&calibrating&&!(p.flags&32))||(calCommand===2&&!!(p.flags&32))||(calCommand===3&&!(p.flags&19))))calPending=false;
  renderCalibration(p.flags,p.progress,p.calibrationReason);
@@ -48,7 +53,7 @@ $('calibrate').onclick=()=>calibrationCommand(calibrationView(latestFlags,0).com
 $('cancelCalibration').onclick=()=>calibrationCommand(3);
 $('demo').onclick=()=>{demo=!demo;qu.identity();qf.identity();$('mode').textContent=demo?'DEMO':'PREVIEW';$('demo').textContent=demo?'Stop demo':'Play demo';message(demo?'Simulated movement. Connect the ESP32 for live tracking.':'Connect your ESP32 to start live tracking.');};
 const observer=new ResizeObserver(()=>{const r=$('viewport').getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height)});observer.observe($('viewport'));
-const arcade=createArcade(renderer,()=>({qu,qf,upperLen,lowerLen,last,flags:latestFlags,calPending,connected:!!device?.gatt.connected}));
+const arcade=createArcade(renderer,()=>({qu,qf,upperLen,lowerLen,last,flags:latestFlags,calPending,samples:trackingSamples,connected:!!device?.gatt.connected}));
 const down=new THREE.Vector3(0,-1,0),u=new THREE.Vector3(),f=new THREE.Vector3();let uiTime=0;
 renderer.setAnimationLoop(now=>{if(demo&&!arcade.active){qu.setFromEuler(new THREE.Euler(.15*Math.sin(now/1300),0,.32+.25*Math.sin(now/1900)));qf.copy(qu).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.85-.8*Math.sin(now/1100)))}
  upper.position.copy(shoulder);upper.quaternion.copy(qu);u.copy(down).applyQuaternion(qu);elbow.position.copy(shoulder).addScaledVector(u,upperLen);lower.position.copy(elbow.position);lower.quaternion.copy(qf);f.copy(down).applyQuaternion(qf);wrist.position.copy(elbow.position).addScaledVector(f,lowerLen);hand.position.copy(wrist.position).addScaledVector(f,.07);hand.quaternion.copy(qf);

@@ -12,7 +12,7 @@ export class PunchTracker{
  }
  consume(){this.used=true;}
 }
-export function strike(enemy){if(enemy.hp<=0)return false;enemy.hp--;return enemy.hp===0;}
+export function strike(enemy,damage=1){if(enemy.hp<=0||!Number.isFinite(damage)||damage<=0)return false;enemy.hp=Math.max(0,enemy.hp-damage);return enemy.hp===0;}
 
 export function nextOpponent(enemies){return enemies.reduce((nearest,e)=>e.hp>0&&!e.dead&&(!nearest||e.root.position.z>nearest.root.position.z)?e:nearest,null);}
 export function punchExtension(seconds){
