@@ -59,10 +59,10 @@ struct PoseWindow {
  unsigned check(const float a[3],const float g[3]) const {
   float norm=sqrtf(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
   if(norm<.7f||norm>1.3f)return 4;
-  for(int j=0;j<3;j++)if(fabsf(g[j])>.5f)return 1;
+  for(int j=0;j<3;j++)if(fabsf(g[j])>.65f)return 1;
   if(count>=40)for(int j=0;j<3;j++){
-   if(gyroM2[j]/(count-1)>.0025f)return 2; // stddev 0.05 rad/s
-   if(accM2[j]/(count-1)>.0064f)return 3; // stddev 0.08 g
+   if(gyroM2[j]/(count-1)>.01f)return 2; // stddev 0.10 rad/s: allow small natural hand tremor
+   if(accM2[j]/(count-1)>.01f)return 3; // stddev 0.10 g; average gentle shaking across the capture
   }
   return 0;
  }
