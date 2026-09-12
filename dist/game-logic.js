@@ -13,3 +13,10 @@ export class PunchTracker{
  consume(){this.used=true;}
 }
 export function strike(enemy){if(enemy.hp<=0)return false;enemy.hp--;return enemy.hp===0;}
+
+export function nextOpponent(enemies){return enemies.reduce((nearest,e)=>e.hp>0&&!e.dead&&(!nearest||e.root.position.z>nearest.root.position.z)?e:nearest,null);}
+export function punchExtension(seconds){
+ if(seconds<0||seconds>.46)return 0;
+ if(seconds<.15){const t=seconds/.15;return t*t*(3-2*t);}
+ const t=(seconds-.15)/.31;return 1-t*t*(3-2*t);
+}

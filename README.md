@@ -106,3 +106,19 @@ Firmware sends reference-relative world rotations. Internal axes are X right, Y 
 - [TDK MPU6050 product information](https://invensense.tdk.com/products/motion-tracking/6-axis/mpu-6050/)
 - [Chrome Web Bluetooth guide](https://developer.chrome.com/docs/capabilities/bluetooth)
 - [Chrome supported device connection instructions](https://support.google.com/chrome/answer/6362090)
+
+
+## Motion arcade and activity estimates
+
+Choose Zombie Boxing (two punches per zombie), Target Rush (45 seconds), Bird Flight (fly through rings), Neon Saber (original rhythm slicing), Sword Arena (two swings per knight), or Orbit Guard (intercept meteors). The same calibrated right-arm connection stays active when switching games. Bird Flight uses arm elevation for altitude and hand position for steering; Orbit Guard follows hand position. Neon Saber and Sword Arena use moving blade collisions.
+
+Keyboard/touch mode offers Space or Action for punches and swings. In Bird Flight and Orbit Guard, use arrow keys or drag inside the scene. Pause or Escape freezes a round; switching games starts a new round. Lost tracking and hidden tabs pause automatically. Use the camera selector, camera motion checkbox, sound toggle, and fullscreen control to suit your setup. Personal best scores and weight preference are stored locally in this browser. Sound starts only after pressing Start.
+
+The session calorie tracker estimates gross energy using weight in kg × selected MET × live active play hours. Choose an assumed effort level in Estimate settings. It is not measured energy expenditure and does not use a heart-rate sensor. Paused, disconnected, hidden-tab, and keyboard/demo time do not count. Remaining still during an active live round still counts as play time, so pause during rests. Changes to settings apply prospectively. Session totals reset on page reload or Reset session. MET background: [Compendium of Physical Activities](https://pacompendium.com/).
+
+
+## Boxing and fitness interface
+
+The arcade opens with a larger boxing scene and compact game navigation. Device setup opens a dialog containing the existing two-pose calibration and connection controls. Sensor diagnostics are collapsible. The workout strip shows estimated calories, active live-play minutes, and a selectable 5-, 10-, or 20-minute time goal.
+
+Boxing uses articulated stylized zombie models, detailed gloves and wraps, walking and attack wind-up animations, hit recoil, and falling knockouts. Every zombie still takes two distinct punches. The Dynamic focus camera eases toward the next living opponent; Over shoulder and First person provide alternatives. Turn off Camera motion for a steady view. Procedural effects include punch whooshes, layered impacts, footsteps, a round bell, and knockouts. Mute with Sound on/off. Real sensor movement drives the right arm directly; eased punch animation applies to keyboard/touch practice.
