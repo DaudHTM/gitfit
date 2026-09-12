@@ -5,7 +5,6 @@
 #include <NimBLEDevice.h>
 #include <atomic>
 #include <math.h>
-#include <MAX30105.h>
 #include <heartRate.h>
 
 void setup();
@@ -29,93 +28,97 @@ void fuse(Imu &s,float dt);
 Imu imus[2]={{0x68},{0x69}};
 NimBLEServer* server;NimBLECharacteristic* dataCharacteristic;
 NimBLECharacteristic* heartCharacteristic;
-// MAX30102: separate I2C controller, only accessed from heartTask.
-constexpr int HEART_SDA=25, HEART_SCL=26;
+// One owner (loop) for the shared Wire bus: MPU6050 0x68/0x69, MAX30102 0x57.
+// No sensor task or cross-task I2C access. Heart work runs after due IMU reads.
 constexpr uint8_t HEART_ADDRESS=0x57;
-constexpr uint32_t FINGER_IR_MIN=50000; // Tune for your breakout/LED current if needed.
-TwoWire heartWire(1);
-MAX30105 heartSensor; // SparkFun's MAX3010x library also supports MAX30102.
-portMUX_TYPE heartMux=portMUX_INITIALIZER_UNLOCKED;
+constexpr uint32_t FINGER_IR_MIN=50000;
+bool regWrite(uint8_t addr,uint8_t reg,uint8_t value);
+bool readRegs(uint8_t addr,uint8_t reg,uint8_t* out,size_t n);
 uint8_t heartFlags=0; // bit0 present, bit1 finger, bit2 valid, bit3 fault
 uint16_t heartBpm10=0;
 uint32_t heartBeatAt=0;
 void publishHeartState(uint8_t flags,uint16_t bpm,uint32_t beatAt){
-  portENTER_CRITICAL(&heartMux);
   heartFlags=flags;heartBpm10=bpm;heartBeatAt=beatAt;
-  portEXIT_CRITICAL(&heartMux);
 }
-bool heartRead(uint8_t reg,uint8_t* out,size_t n){
-  heartWire.beginTransmission(HEART_ADDRESS);heartWire.write(reg);
-  if(heartWire.endTransmission(false)!=0)return false;
-  if(heartWire.requestFrom(HEART_ADDRESS,n,true)!=n)return false;
-  for(size_t i=0;i<n;i++)out[i]=heartWire.read();
-  return true;
-}
-void heartTask(void*){
-  heartWire.begin(HEART_SDA,HEART_SCL,400000);heartWire.setTimeOut(5);
-  bool online=false,finger=false;uint32_t retryAt=0,sampleTime=0,lastBeatSample=0;
-  uint32_t lastDataAt=millis(),fingerSince=0,beatWall=0;
-  float intervals[4]={};uint8_t count=0,index=0;
-  for(;;){
-    uint32_t now=millis();
-    if(!online){
-      if(int32_t(now-retryAt)>=0){
-        online=heartSensor.begin(heartWire,I2C_SPEED_FAST,HEART_ADDRESS);
-        if(online){
-          // 100 optical samples/sec, no averaging, red+IR (MAX30102 has no green LED).
-          heartSensor.setup(0x1F,1,2,100,411,4096);
-          heartSensor.clearFIFO();lastDataAt=millis();count=0;index=0;lastBeatSample=0;finger=false;
-          publishHeartState(1,0,0);
-        }else{publishHeartState(8,0,0);retryAt=now+2000;}
-      }
-      vTaskDelay(pdMS_TO_TICKS(10));continue;
+void serviceHeart(){
+  static bool online=false,finger=false;
+  static uint32_t nextPoll=0,retryAt=0,resetDeadline=0,sampleTime=0,lastBeatSample=0;
+  static uint32_t lastDataAt=0,fingerSince=0,beatWall=0;
+  static float intervals[4]={};
+  static uint8_t count=0,index=0,stage=0,configIndex=0;
+  // MAX30102 register settings: interrupts off, averaging 1, FIFO rollover,
+  // ADC range 4096, 100 Hz, 411 us, red+IR LEDs. One write per service call.
+  static const uint8_t config[][2]={
+    {0x02,0x00},{0x03,0x00},{0x08,0x10},{0x0A,0x27},
+    {0x0C,0x1F},{0x0D,0x1F},{0x04,0x00},{0x05,0x00},{0x06,0x00},{0x09,0x03}
+  };
+  uint32_t now=millis();
+  if(int32_t(now-nextPoll)<0)return;
+  nextPoll=now+2;
+  auto unavailable=[&](){online=false;stage=0;retryAt=now+2000;finger=false;count=0;index=0;lastBeatSample=0;beatWall=0;publishHeartState(8,0,0);};
+  if(!online){
+    if(int32_t(now-retryAt)<0)return;
+    uint8_t value=0;
+    switch(stage){
+      case 0:
+        if(!readRegs(HEART_ADDRESS,0xFF,&value,1)||value!=0x15){unavailable();return;}
+        stage=1;publishHeartState(1,0,0);return;
+      case 1:
+        if(!regWrite(HEART_ADDRESS,0x09,0x40)){unavailable();return;}
+        resetDeadline=now+100;stage=2;return;
+      case 2:
+        if(!readRegs(HEART_ADDRESS,0x09,&value,1)){unavailable();return;}
+        if(value&0x40){if(int32_t(now-resetDeadline)>=0)unavailable();return;}
+        configIndex=0;stage=3;return;
+      case 3:
+        if(!regWrite(HEART_ADDRESS,config[configIndex][0],config[configIndex][1])){unavailable();return;}
+        if(++configIndex==sizeof(config)/sizeof(config[0])){
+          online=true;lastDataAt=now;count=0;index=0;lastBeatSample=0;beatWall=0;finger=false;
+        }
+        return;
     }
-    uint8_t pointers[3]; // write pointer, overflow count, read pointer
-    if(!heartRead(0x04,pointers,3)){
-      online=false;retryAt=now+2000;publishHeartState(8,0,0);continue;
-    }
-    uint8_t available=(pointers[0]-pointers[2])&31;
-    // Reject a backlog instead of assigning incorrect timestamps to old samples.
-    if(pointers[1]||available>4){
-      heartSensor.clearFIFO();count=0;index=0;lastBeatSample=0;finger=false;
-      publishHeartState(1,0,0);lastDataAt=now;
-      vTaskDelay(pdMS_TO_TICKS(2)>0?pdMS_TO_TICKS(2):1);continue;
-    }
-    for(uint8_t i=0;i<available;i++){
-      uint8_t raw[6]; // red 18-bit followed by IR 18-bit
-      if(!heartRead(0x07,raw,6)){online=false;retryAt=now+2000;publishHeartState(8,0,0);break;}
-      uint32_t ir=((uint32_t(raw[3])<<16)|(uint32_t(raw[4])<<8)|raw[5])&0x3FFFF;
-      sampleTime+=10;lastDataAt=now;
-      bool beat=checkForBeat(int32_t(ir)); // Called at the optical sampling rate, never just 4 Hz.
-      if(ir<FINGER_IR_MIN||ir>=260000){
-        finger=false;count=0;index=0;lastBeatSample=0;beatWall=0;publishHeartState(1,0,0);continue;
-      }
-      if(!finger){finger=true;fingerSince=sampleTime;count=0;index=0;lastBeatSample=0;beatWall=0;}
-      // Let the filter settle after placing/replacing a finger.
-      if(uint32_t(sampleTime-fingerSince)<2000){publishHeartState(3,0,0);continue;}
-      if(beat){
-        uint32_t interval=sampleTime-lastBeatSample;
-        if(lastBeatSample&&interval>=273&&interval<=1714){ // approximately 35–220 bpm
-          intervals[index]=float(interval);index=(index+1)%4;if(count<4)count++;
-          float sum=0,lo=2000,hi=0;
-          for(uint8_t j=0;j<count;j++){sum+=intervals[j];lo=fminf(lo,intervals[j]);hi=fmaxf(hi,intervals[j]);}
-          float average=sum/count;
-          bool valid=count>=3&&(hi-lo)<average*.25f;
-          beatWall=now;
-          publishHeartState(valid?7:3,valid?uint16_t(lroundf(600000.0f/average)):0,beatWall);
-        }else{count=0;index=0;publishHeartState(3,0,0);}
-        lastBeatSample=sampleTime;
-      }
-      if(!beatWall||uint32_t(now-beatWall)>2500){publishHeartState(3,0,0);if(lastBeatSample&&uint32_t(sampleTime-lastBeatSample)>2500){count=0;index=0;lastBeatSample=0;}}
-    }
-    if(uint32_t(now-lastDataAt)>250){online=false;retryAt=now+2000;publishHeartState(8,0,0);}
-    vTaskDelay(pdMS_TO_TICKS(2)>0?pdMS_TO_TICKS(2):1);
+  }
+  uint8_t pointers[3];
+  if(!readRegs(HEART_ADDRESS,0x04,pointers,3)){unavailable();return;}
+  uint8_t available=(pointers[0]-pointers[2])&31;
+  if(pointers[1]||available>4){
+    // Reinitialize in short steps rather than blocking while flushing a backlog.
+    unavailable();retryAt=now;publishHeartState(1,0,0);return;
+  }
+  if(!available){if(uint32_t(now-lastDataAt)>250)unavailable();return;}
+  // At most one optical sample per call, allowing IMUs to run between samples.
+  uint8_t raw[6];
+  if(!readRegs(HEART_ADDRESS,0x07,raw,6)){unavailable();return;}
+  uint32_t ir=((uint32_t(raw[3])<<16)|(uint32_t(raw[4])<<8)|raw[5])&0x3FFFF;
+  sampleTime+=10;lastDataAt=now;
+  bool beat=checkForBeat(int32_t(ir));
+  if(ir<FINGER_IR_MIN||ir>=260000){
+    finger=false;count=0;index=0;lastBeatSample=0;beatWall=0;publishHeartState(1,0,0);return;
+  }
+  if(!finger){finger=true;fingerSince=sampleTime;count=0;index=0;lastBeatSample=0;beatWall=0;}
+  if(uint32_t(sampleTime-fingerSince)<2000){publishHeartState(3,0,0);return;}
+  if(beat){
+    uint32_t interval=sampleTime-lastBeatSample;
+    if(lastBeatSample&&interval>=273&&interval<=1714){
+      intervals[index]=float(interval);index=(index+1)%4;if(count<4)count++;
+      float sum=0,lo=2000,hi=0;
+      for(uint8_t j=0;j<count;j++){sum+=intervals[j];lo=fminf(lo,intervals[j]);hi=fmaxf(hi,intervals[j]);}
+      float average=sum/count;
+      bool valid=count>=3&&(hi-lo)<average*.25f;
+      beatWall=now;
+      publishHeartState(valid?7:3,valid?uint16_t(lroundf(600000.0f/average)):0,beatWall);
+    }else{count=0;index=0;publishHeartState(3,0,0);}
+    lastBeatSample=sampleTime;
+  }
+  if(!beatWall||uint32_t(now-beatWall)>2500){
+    publishHeartState(3,0,0);
+    if(lastBeatSample&&uint32_t(sampleTime-lastBeatSample)>2500){count=0;index=0;lastBeatSample=0;}
   }
 }
 void sendHeartPacket(){
   static uint16_t heartSequence=0;
   uint8_t flags;uint16_t bpm;uint32_t beatAt;
-  portENTER_CRITICAL(&heartMux);flags=heartFlags;bpm=heartBpm10;beatAt=heartBeatAt;portEXIT_CRITICAL(&heartMux);
+  flags=heartFlags;bpm=heartBpm10;beatAt=heartBeatAt;
   uint32_t age=beatAt?uint32_t(millis()-beatAt):65535;
   if(age>2500){flags&=~4;bpm=0;} // Never send an old estimate as valid.
   uint16_t age16=uint16_t(age>65535?65535:age);
@@ -164,12 +167,14 @@ for(auto &s:imus){for(int j=0;j<3;j++)s.bias[j]=0;s.q=reference;}
 calibrated=true;
 Serial.println("Calibration bypassed - using raw gyro, no bias correction.");
  NimBLEDevice::init("Armature-ESP32");server=NimBLEDevice::createServer();server->setCallbacks(&serverCallbacks);auto service=server->createService(SERVICE);dataCharacteristic=service->createCharacteristic(DATA,NIMBLE_PROPERTY::NOTIFY);heartCharacteristic=service->createCharacteristic(HEART,NIMBLE_PROPERTY::NOTIFY);auto control=service->createCharacteristic(CONTROL,NIMBLE_PROPERTY::WRITE);control->setCallbacks(&controlCallbacks);service->start();auto adv=NimBLEDevice::getAdvertising();adv->setName("Armature-ESP32");adv->addServiceUUID(SERVICE);adv->enableScanResponse(true);adv->start();
- if(xTaskCreate(heartTask,"heart-sensor",4096,nullptr,1,nullptr)!=pdPASS){publishHeartState(8,0,0);Serial.println("Heart sensor task could not start");}
  Serial.println("Ready. Connect in Chrome, then calibrate.");}
 void loop(){
   static uint32_t heartSent=0;
   if(uint32_t(millis()-heartSent)>=250){heartSent=millis();if(server->getConnectedCount())sendHeartPacket();}
-  static uint32_t previous=micros(),sent=micros();uint32_t now=micros();if(uint32_t(now-previous)<5000){delay(1);return;}float dt=uint32_t(now-previous)*1e-6f;previous=now;if(requestCalibration.exchange(false))beginCalibration();bool okA=readImu(imus[0]),okB=readImu(imus[1]);fault=!okA||!okB;
+  static uint32_t previous=micros(),sent=micros();uint32_t now=micros();if(uint32_t(now-previous)<5000){
+    if(uint32_t(now-previous)<3000)serviceHeart(); // Leave headroom before the next IMU deadline.
+    delay(1);return;
+  }float dt=uint32_t(now-previous)*1e-6f;previous=now;if(requestCalibration.exchange(false))beginCalibration();bool okA=readImu(imus[0]),okB=readImu(imus[1]);fault=!okA||!okB;
    static uint32_t dbg=0;
  if(DEBUG_IMU && millis()-dbg>300){dbg=millis();
   Serial.printf("imu0 a=[%.3f %.3f %.3f] g=[%.3f %.3f %.3f] ok=%d | imu1 a=[%.3f %.3f %.3f] g=[%.3f %.3f %.3f] ok=%d fault=%d\n",
@@ -177,4 +182,7 @@ void loop(){
    imus[1].a[0],imus[1].a[1],imus[1].a[2],imus[1].g[0],imus[1].g[1],imus[1].g[2],okB,fault);
  }
  if(fault){calibrated=false;calibrating=false;}else if(calibrating){calibrationSample();}else if(calibrated){if(dt>.025f){calibrated=false;}else for(auto &s:imus)fuse(s,dt);}
- if(uint32_t(now-sent)>=10000){sent=now;if(server->getConnectedCount())sendPacket();}}
+ if(uint32_t(now-sent)>=10000){sent=now;if(server->getConnectedCount())sendPacket();}
+  if(uint32_t(micros()-previous)<3000)serviceHeart();
+}
+

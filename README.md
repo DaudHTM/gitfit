@@ -18,23 +18,23 @@ Punch detection derives wrist motion from the two tracked segment orientations, 
 
 This firmware is based on your working pasted sketch: it preserves the `0x98` IMU identity allowance and startup calibration bypass. Your serial diagnostic blocks are retained behind `DEBUG_IMU = false`; enable that flag for troubleshooting. The bypass means the arm is marked calibrated without measured gyro bias until you explicitly calibrate.
 
-Install **SparkFun MAX3010x Pulse and Proximity Sensor Library** in Arduino Library Manager (by SparkFun, version 1.1.2). It supplies both `MAX30105.h` and `heartRate.h`; the MAX30105 class supports MAX30102 in red+IR mode. Keep **NimBLE-Arduino 2.x** installed (your machine has 2.5.1). Replace the entire old sketch with the downloaded `ArmTracker.ino`; do not append a second setup/loop. The explicit setup/loop declarations and multiline loop avoid the earlier declaration issue.
+Install **SparkFun MAX3010x Pulse and Proximity Sensor Library** in Arduino Library Manager (by SparkFun, version 1.1.2). It supplies `heartRate.h` for beat detection. This sketch configures the MAX30102 directly in small register operations to keep bus work bounded. Keep **NimBLE-Arduino 2.x** installed (your machine has 2.5.1). Replace the entire old sketch with the downloaded `ArmTracker.ino`; do not append a second setup/loop. The explicit setup/loop declarations and multiline loop avoid the earlier declaration issue.
 
-Use these **additional** connections for a regulated GY-MAX30102 breakout, on a separate I²C controller:
+Use these **additional** connections for a regulated GY-MAX30102 breakout, on the **same I²C bus as both IMUs**:
 
 | ESP32 | GY-MAX30102 |
 |---|---|
-| GPIO25 | SDA |
-| GPIO26 | SCL |
+| GPIO21 | SDA |
+| GPIO22 | SCL |
 | GND | GND |
 | 3V3 | VIN/VCC **only if your breakout specifies 3.3 V input** |
 | No connection | INT |
 
-Leave both IMUs on GPIO21/22. MAX30102 address is 0x57. These pins target the original ESP32 DevKit/WROOM; change HEART_SDA/HEART_SCL for other boards. Use the module's labelled VIN, not a 1.8 V rail. Check your exact breakout's regulator and I²C level shifting; a bare MAX30102 needs separate 1.8 V and LED supplies and cannot use this breakout wiring directly. ESP32 I²C requires compatible 3.3 V logic. If your breakout's SDA/SCL pull-ups are 1.8 V, use an appropriate level shifter; never use 5 V pull-ups on ESP32 pins. Turn power off before wiring.
+Connect all three SDA pins together to GPIO21 and all three SCL pins together to GPIO22. GPIO25/26 are no longer used. The addresses are 0x68, 0x69, and 0x57. These pins target the original ESP32 DevKit/WROOM; change SDA_PIN/SCL_PIN for other boards. Use the module's labelled VIN, not a 1.8 V rail. Check your exact breakout's regulator and I²C level shifting; a bare MAX30102 needs separate 1.8 V and LED supplies and cannot use this breakout wiring directly. ESP32 I²C requires compatible 3.3 V logic. If your breakout's SDA/SCL pull-ups are 1.8 V, use an appropriate level shifter; never use 5 V pull-ups on ESP32 pins. Turn power off before wiring.
 
-The sensor task samples red/IR at **100 Hz** for beat detection, on its own bus. Heart-rate BLE notifications are **4 Hz** on a separate characteristic; the 20-byte, 100 Hz arm stream is unchanged. BPM is averaged over up to four accepted beat intervals, so 4 Hz display updates are not four newly measured beats per second. After applying your fingertip, allow roughly 5–10 seconds for filter settling and several beats. Hold the sensor gently against a stationary fingertip with consistent contact; the left/non-punching hand works best during boxing. Motion can create incorrect estimates even when a value is shown. This is an experimental BPM estimate, not SpO₂ or a medical measurement.
+The MAX30102 samples red/IR at **100 Hz** for beat detection. One loop owns the shared `Wire` bus, eliminating cross-task I²C transactions. Due IMU reads take priority; remaining time services at most one optical sample per call. Heart-sensor initialization/recovery advances through short register operations instead of a blocking reset loop. Heart-rate BLE notifications are **4 Hz** on a separate characteristic; the 20-byte, 100 Hz arm stream is unchanged. BPM is averaged over up to four accepted beat intervals, so 4 Hz display updates are not four newly measured beats per second. After applying your fingertip, allow roughly 5–10 seconds for filter settling and several beats. Hold the sensor gently against a stationary fingertip with consistent contact; the left/non-punching hand works best during boxing. Motion can create incorrect estimates even when a value is shown. This is an experimental BPM estimate, not SpO₂ or a medical measurement.
 
-The firmware rejects out-of-range/irregular intervals, expires old estimates, and retries an absent sensor every two seconds without stopping arm tracking. `FINGER_IR_MIN = 50000` is a starting threshold, not universal; adjust for your module and optical contact if it never detects a finger. Missing/no-contact/acquiring/stale states display a dash instead of 0 BPM. Refresh/reconnect after flashing; remove the browser's old Bluetooth permission or restart Bluetooth if the OS caches the previous GATT service. Old firmware without the new characteristic still works for motion but displays “Heart-rate firmware not available.”
+The firmware rejects out-of-range/irregular intervals, expires old estimates, and retries an absent sensor every two seconds. A missing device does not halt startup. Because the bus is shared, a sensor or cable physically holding SDA/SCL low can disrupt all three devices; software scheduling cannot isolate that electrical fault. `FINGER_IR_MIN = 50000` is a starting threshold, not universal; adjust for your module and optical contact if it never detects a finger. Missing/no-contact/acquiring/stale states display a dash instead of 0 BPM. Refresh/reconnect after flashing; remove the browser's old Bluetooth permission or restart Bluetooth if the OS caches the previous GATT service. Old firmware without the new characteristic still works for motion but displays “Heart-rate firmware not available.”
 
 Heart characteristic: `8c310004-7a94-4b2d-b7bb-5de91f2d9a10` (notify).
 
@@ -59,7 +59,7 @@ Assumption: a classic ESP32 DevKit/WROOM with Bluetooth LE, and two MPU6050 brea
 | GPIO21 | SDA | SDA |
 | GPIO22 | SCL | SCL |
 
-Bicep address is 0x68; forearm is 0x69. Leave INT, XDA and XCL disconnected. Power off before wiring. Use common ground and 3.3 V pull-ups, never 5 V on ESP32 GPIO. Most breakouts already have pull-ups; check yours before adding any. If absent, add one 4.7 kΩ SDA-to-3V3 and one SCL-to-3V3 resistor. Keep wires short, secured, and separated from high-current wiring. Long arm-length I²C cables can become unreliable at 400 kHz: reduce Wire.begin clock to 100000 if needed and measure the resulting sample rate. USB power from a power bank is convenient for a wearable demo. Insulate the boards.
+Bicep address is 0x68; forearm is 0x69. Leave INT, XDA and XCL disconnected. Power off before wiring. Use common ground and 3.3 V pull-ups, never 5 V on ESP32 GPIO. Most breakouts already have pull-ups; check yours before adding any. Three breakout pull-ups appear in parallel, so check the combined resistance and remove redundant pull-ups if needed; do not blindly add another set. If absent, add one 4.7 kΩ SDA-to-3V3 and one SCL-to-3V3 resistor. Keep wires short, secured, and separated from high-current wiring. Long arm-length I²C cables can become unreliable at 400 kHz: reduce Wire.begin clock to 100000 if needed and measure the resulting sample rate. USB power from a power bank is convenient for a wearable demo. Insulate the boards.
 
 ## Flash
 
@@ -117,7 +117,7 @@ Firmware sends reference-relative world rotations. Internal axes are X right, Y 
 
 ## Verification and dependencies
 
-`npm test` runs binary decoder and sequence-wrap tests; `npm run check` checks JavaScript syntax. Three.js is pinned to 0.180.0 through a CDN import map; first load needs internet. Google fonts are optional with local fallbacks. The MAX30102 firmware compiled successfully for esp32:esp32:esp32 using Arduino-ESP32 3.3.11, NimBLE-Arduino 2.5.1, and SparkFun MAX3010x 1.1.2: 621300 bytes flash (47%), 37852 bytes static RAM (11%). Browser simulations verified valid BPM, no contact, stale readings, disconnects, and older firmware. Actual optical readings and motion performance still require testing on your boards; no hardware was flashed during authoring.
+`npm test` runs binary decoder and sequence-wrap tests; `npm run check` checks JavaScript syntax. Three.js is pinned to 0.180.0 through a CDN import map; first load needs internet. Google fonts are optional with local fallbacks. The shared-bus firmware compiled successfully for esp32:esp32:esp32 using Arduino-ESP32 3.3.11, NimBLE-Arduino 2.5.1, and SparkFun MAX3010x 1.1.2: 619736 bytes flash (47%), 37748 bytes static RAM (11%). Browser simulations verified valid BPM, no contact, stale readings, disconnects, and older firmware. Actual optical readings and motion performance still require testing on your boards; no hardware was flashed during authoring.
 
 ## Sources
 
