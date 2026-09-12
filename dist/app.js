@@ -21,8 +21,8 @@ let upperLen=.3,lowerLen=.26;function dimensions(){upperLen=Math.min(50,Math.max
 const hand=new THREE.Mesh(new THREE.CapsuleGeometry(.033,.075,6,16),teal);scene.add(hand);
 const qu=new THREE.Quaternion(),qf=new THREE.Quaternion(),basis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2),basisInv=basis.clone().invert();
 let device=null,control=null,stream=null,busy=false,demo=false,last=0,seq=null,lost=0,count=0,rateStart=performance.now(),latestFlags=0,calPending=false,calDeadline=0,calCommand=0;
-function renderCalibration(flags,progress=0){
- const v=calibrationView(flags,progress,calPending);
+function renderCalibration(flags,progress=0,reason=0){
+ const v=calibrationView(flags,progress,calPending,reason);
  $('calStep').textContent=v.ready?'READY':`POSE ${v.step} OF 2`;
  $('calTitle').textContent=v.title;
  $('calInstructions').textContent=v.ready?'You can move your arm now. Recalibrate if either sensor slips.':v.step===2?'Extend your right arm sideways at shoulder height, elbow straight and palm toward the floor. Hold still for 3 seconds.':'Stand upright, right arm straight at your side, palm toward your thigh. Hold still for 3 seconds.';
@@ -37,7 +37,7 @@ function receive(e){try{const p=decode(e.target.value);const now=performance.now
  for(const [i,q] of [qu,qf].entries()){const a=p.qs[i];q.set(a[1],a[2],a[3],a[0]).premultiply(basis).multiply(basisInv).normalize()}
  const calibrating=!!(p.flags&2),ready=!!(p.flags&1),fault=!!(p.flags&4);
  if(calPending&&((calCommand===1&&calibrating&&!(p.flags&32))||(calCommand===2&&!!(p.flags&32))||(calCommand===3&&!(p.flags&19))))calPending=false;
- renderCalibration(p.flags,p.progress);
+ renderCalibration(p.flags,p.progress,p.calibrationReason);
  $('mode').textContent=fault?'SENSOR ERROR':calibrating?'CALIBRATING':ready?'LIVE':(p.flags&16)?'T-POSE NEXT':'NEEDS CALIBRATION';$('upperState').textContent=$('lowerState').textContent=fault?'Check wiring':'Streaming';
  }catch(err){message(err.message)}}
 $('connect').onclick=async()=>{if(busy)return;if(device?.gatt.connected){device.gatt.disconnect();return}if(!navigator.bluetooth||!isSecureContext){message('Open this page in Chrome on a supported computer, using HTTPS or localhost. This browser cannot access Web Bluetooth.');return}busy=true;$('connect').disabled=true;demo=false;$('demo').textContent='Play demo';try{device=await navigator.bluetooth.requestDevice({filters:[{services:[SERVICE]}]});device.addEventListener('gattserverdisconnected',()=>{reset();message('ESP32 disconnected. Reconnect and calibrate before tracking again.')},{once:true});const server=await device.gatt.connect();const service=await server.getPrimaryService(SERVICE);control=await service.getCharacteristic(CONTROL);stream=await service.getCharacteristic(DATA);stream.addEventListener('characteristicvaluechanged',receive);await stream.startNotifications();

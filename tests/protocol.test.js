@@ -2,3 +2,5 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import {d
 test('20-byte firmware packet decodes little-endian wxyz and status',()=>{let v=new DataView(new ArrayBuffer(20));v.setUint16(0,65535,true);v.setUint8(2,3);v.setUint8(3,42);v.setInt16(4,32767,true);v.setInt16(14,-32767,true);let p=decode(v);assert.equal(p.sequence,65535);assert.equal(p.flags,3);assert.equal(p.progress,42);assert.deepEqual(p.qs,[[1,0,0,0],[0,-1,0,0]])});
 test('reject malformed payloads',()=>{assert.throws(()=>decode(new DataView(new ArrayBuffer(19))));assert.throws(()=>decode(new DataView(new ArrayBuffer(20))))});
 test('sequence counts skipped samples including rollover',()=>{assert.equal(sequenceGap(null,400),0);assert.equal(sequenceGap(65535,0),0);assert.equal(sequenceGap(65534,2),3);assert.equal(sequenceGap(8,11),2)});
+
+test('restart diagnostic codes do not display as a percentage',()=>{const v=new DataView(new ArrayBuffer(20));v.setUint8(3,135);v.setInt16(4,32767,true);v.setInt16(12,32767,true);const p=decode(v);assert.equal(p.progress,0);assert.equal(p.calibrationReason,7);});

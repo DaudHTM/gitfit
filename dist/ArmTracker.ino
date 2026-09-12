@@ -43,9 +43,35 @@ bool frameFromPoses(V downGravity,V tGravity,Q &frame){
  frame=normalize(q);return true;
 }
 // END CALIBRATION MATH
+// BEGIN POSE STABILITY
+struct PoseWindow {
+ unsigned count=0;
+ float gyroMean[3]={},gyroM2[3]={},accMean[3]={},accM2[3]={};
+ // Welford moments avoid subtracting nearly equal floating-point values.
+ void add(const float a[3],const float g[3]){
+  count++;
+  for(int j=0;j<3;j++){
+   float d=g[j]-gyroMean[j];gyroMean[j]+=d/count;gyroM2[j]+=d*(g[j]-gyroMean[j]);
+   d=a[j]-accMean[j];accMean[j]+=d/count;accM2[j]+=d*(a[j]-accMean[j]);
+  }
+ }
+ // 1 rotation, 2 gyro instability, 3 acceleration instability, 4 invalid acceleration.
+ unsigned check(const float a[3],const float g[3]) const {
+  float norm=sqrtf(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
+  if(norm<.7f||norm>1.3f)return 4;
+  for(int j=0;j<3;j++)if(fabsf(g[j])>.5f)return 1;
+  if(count>=40)for(int j=0;j<3;j++){
+   if(gyroM2[j]/(count-1)>.0025f)return 2; // stddev 0.05 rad/s
+   if(accM2[j]/(count-1)>.0064f)return 3; // stddev 0.08 g
+  }
+  return 0;
+ }
+};
+// END POSE STABILITY
 struct Imu{
  uint8_t addr;float a[3]={},g[3]={},bias[3]={};
- float sum[3]={},square[3]={},accSum[3]={},accSquare[3]={},downMean[3]={},downBias[3]={};
+ float downMean[3]={},downBias[3]={};
+ PoseWindow pose;
  Q q{},reference{};
 };
 bool initImu(Imu &s);
@@ -57,7 +83,8 @@ std::atomic<uint8_t> requestCalibration{0};
 bool calibrated=false,calibrating=false,rejected=false,fault=false,poseError=false;
 uint8_t calibrationStage=0; // 0 idle, 1 capturing down, 2 waiting for T, 3 capturing T
 uint16_t samples=0,sequence=0;
-uint32_t calibrationStart=0,windowStart=0;
+uint32_t calibrationStart=0,windowStart=0,lastResetAt=0;
+uint8_t resetReason=0;
 constexpr uint32_t POSE_HOLD_MS=3000;
 bool regWrite(uint8_t addr,uint8_t reg,uint8_t value){Wire.beginTransmission(addr);Wire.write(reg);Wire.write(value);return Wire.endTransmission()==0;}
 bool readRegs(uint8_t addr,uint8_t reg,uint8_t* out,size_t n){Wire.beginTransmission(addr);Wire.write(reg);if(Wire.endTransmission(false)!=0)return false;if(Wire.requestFrom(addr,n,true)!=n)return false;for(size_t i=0;i<n;i++)out[i]=Wire.read();return true;}
@@ -76,9 +103,16 @@ void fuse(Imu &s,float dt){float gx=s.g[0]-s.bias[0],gy=s.g[1]-s.bias[1],gz=s.g[
  Q dq=mul(q,{0,gx,gy,gz});s.q=normalize({q.w+.5f*dq.w*dt,q.x+.5f*dq.x*dt,q.y+.5f*dq.y*dt,q.z+.5f*dq.z*dt});}
 void clearPoseWindow(){
  samples=0;windowStart=millis();
- for(auto &s:imus)for(int j=0;j<3;j++)s.sum[j]=s.square[j]=s.accSum[j]=s.accSquare[j]=0;
+ for(auto &s:imus)s.pose=PoseWindow{};
+}
+void restartPoseWindow(uint8_t reason){
+ resetReason=reason;lastResetAt=millis();
+ static uint32_t printed=0;
+ if(uint32_t(millis()-printed)>1000){printed=millis();Serial.printf("Calibration window restarted: sensor=%u reason=%u (1=rotation 2=gyro variation 3=accel variation 4=accel range)\n",(reason-1)/4,(reason-1)%4+1);}
+ clearPoseWindow();
 }
 void beginCalibration(uint8_t command){
+ resetReason=0;
  if(command==3){calibrationStage=0;calibrating=false;calibrated=false;rejected=false;poseError=false;return;}
  if(command==1){calibrationStage=1;for(auto &s:imus){s.q={};s.reference={};}}
  else if(command==2&&calibrationStage==2)calibrationStage=3;
@@ -91,44 +125,44 @@ void rejectPose(bool geometry){
 }
 void calibrationSample(){
  if(uint32_t(millis()-calibrationStart)>20000){rejectPose(false);return;}
- bool still=true;
- for(auto &s:imus){float n=sqrtf(s.a[0]*s.a[0]+s.a[1]*s.a[1]+s.a[2]*s.a[2]);
-  if(n<.8f||n>1.2f)still=false;
-  for(int j=0;j<3;j++)if(fabsf(s.g[j])>.20f)still=false;
+ // Evaluate noise continuously rather than rejecting only at 99%.
+ for(int i=0;i<2;i++){
+  auto &s=imus[i];unsigned reason=s.pose.check(s.a,s.g);
+  if(reason){restartPoseWindow(uint8_t(i*4+reason));return;}
  }
- if(!still){clearPoseWindow();return;}
  samples++;
- for(auto &s:imus)for(int j=0;j<3;j++){
-  s.sum[j]+=s.g[j];s.square[j]+=s.g[j]*s.g[j];s.accSum[j]+=s.a[j];s.accSquare[j]+=s.a[j]*s.a[j];
+ for(int i=0;i<2;i++){
+  auto &s=imus[i];s.pose.add(s.a,s.g);
+  unsigned reason=s.pose.check(s.a,s.g);
+  if(reason){restartPoseWindow(uint8_t(i*4+reason));return;}
  }
  if(uint32_t(millis()-windowStart)<POSE_HOLD_MS||samples<200)return;
- for(auto &s:imus)for(int j=0;j<3;j++){
-  float g=s.sum[j]/samples,a=s.accSum[j]/samples;
-  if(s.square[j]/samples-g*g>.0001f||s.accSquare[j]/samples-a*a>.0025f){clearPoseWindow();return;}
- }
  if(calibrationStage==1){
-  for(auto &s:imus)for(int j=0;j<3;j++){s.downMean[j]=s.accSum[j]/samples;s.downBias[j]=s.sum[j]/samples;}
-  calibrationStage=2;calibrating=false;samples=0;Serial.println("Arm-down captured. Extend right arm sideways, palm down, then capture T-pose.");return;
+  for(auto &s:imus)for(int j=0;j<3;j++){s.downMean[j]=s.pose.accMean[j];s.downBias[j]=s.pose.gyroMean[j];}
+  calibrationStage=2;calibrating=false;samples=0;resetReason=0;Serial.println("Arm-down captured. Extend right arm sideways, palm down, then capture T-pose.");return;
  }
  Q frames[2];
  for(int i=0;i<2;i++){
-  Imu &s=imus[i];V d={s.downMean[0],s.downMean[1],s.downMean[2]};V t={s.accSum[0]/samples,s.accSum[1]/samples,s.accSum[2]/samples};
+  Imu &s=imus[i];V d={s.downMean[0],s.downMean[1],s.downMean[2]};V t={s.pose.accMean[0],s.pose.accMean[1],s.pose.accMean[2]};
   if(!frameFromPoses(d,t,frames[i])){rejectPose(true);Serial.println("T-pose rejected: keep elbow straight and arm horizontal to your right.");return;}
  }
  // At completion the person is still in T-pose, not arm-down.
  const Q downToT={.70710678f,0,-.70710678f,0};
  for(int i=0;i<2;i++){
   Imu &s=imus[i];s.reference=frames[i];s.q=mul(downToT,s.reference);
-  for(int j=0;j<3;j++)s.bias[j]=.5f*(s.downBias[j]+s.sum[j]/samples);
+  for(int j=0;j<3;j++)s.bias[j]=.5f*(s.downBias[j]+s.pose.gyroMean[j]);
  }
- calibrationStage=0;calibrating=false;calibrated=true;rejected=false;poseError=false;
+ calibrationStage=0;calibrating=false;calibrated=true;rejected=false;poseError=false;resetReason=0;
  Serial.println("Two-pose calibration complete. Sensor mounting frames and gyro biases learned.");
 }
 class ServerCallbacks:public NimBLEServerCallbacks{void onConnect(NimBLEServer* s,NimBLEConnInfo& c)override{s->updateConnParams(c.getConnHandle(),6,12,0,200);}void onDisconnect(NimBLEServer*,NimBLEConnInfo&,int)override{requestCalibration.store(3);NimBLEDevice::startAdvertising();}} serverCallbacks;
 class ControlCallbacks:public NimBLECharacteristicCallbacks{void onWrite(NimBLECharacteristic* c,NimBLEConnInfo&)override{auto v=c->getValue();if(v.size()==1&&uint8_t(v[0])>=1&&uint8_t(v[0])<=3)requestCalibration.store(uint8_t(v[0]));}} controlCallbacks;
 void sendPacket(){uint8_t b[20]={};b[0]=sequence&255;b[1]=sequence>>8;sequence++;b[2]=128|(calibrated?1:0)|(calibrating?2:0)|(fault?4:0)|(rejected?8:0)|(calibrationStage>=2?16:0)|(calibrationStage==3?32:0)|(poseError?64:0);
  uint32_t progress=(millis()-windowStart)*100/POSE_HOLD_MS;
+ uint32_t sampleProgress=uint32_t(samples)*100/200;
+ if(sampleProgress<progress)progress=sampleProgress;
  b[3]=calibrating?uint8_t(progress>99?99:progress):(calibrated||calibrationStage==2?100:0);
+ if(resetReason&&((calibrating&&uint32_t(millis()-lastResetAt)<1000)||(rejected&&!poseError)))b[3]=128+resetReason;
  for(int i=0;i<2;i++){Q r=imus[i].reference;Q q=mul(imus[i].q,{r.w,-r.x,-r.y,-r.z});float values[4]={q.w,q.x,q.y,q.z};for(int j=0;j<4;j++){int16_t v=lroundf(fmaxf(-1,fminf(1,values[j]))*32767);b[4+i*8+j*2]=uint16_t(v)&255;b[5+i*8+j*2]=uint16_t(v)>>8;}}
  dataCharacteristic->setValue(b,sizeof(b));dataCharacteristic->notify();}
 void setup(){Serial.begin(115200);Wire.begin(SDA_PIN,SCL_PIN,400000);Wire.setTimeOut(5);delay(100);bool ok=true;for(auto &s:imus){bool found=initImu(s);Serial.printf("MPU 0x%02x: %s\n",s.addr,found?"OK":"FAILED");ok&=found;}if(!ok){Serial.println("Fix wiring and reset ESP32.");while(true)delay(1000);}delay(100);

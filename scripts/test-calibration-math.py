@@ -1,6 +1,7 @@
 from pathlib import Path
 import subprocess,tempfile
 source=Path('firmware/ArmTracker/ArmTracker.ino').read_text().split('// BEGIN CALIBRATION MATH')[1].split('// END CALIBRATION MATH')[0]
+source+=Path('firmware/ArmTracker/ArmTracker.ino').read_text().split('// BEGIN POSE STABILITY')[1].split('// END POSE STABILITY')[0]
 test=r'''
 #include <cassert>
 #include <random>
@@ -21,6 +22,19 @@ int main(){
    V gravity=rotate({current.w,-current.x,-current.y,-current.z},{0,0,1});
    assert(fabsf(gravity.x-t.x)<1e-5f&&fabsf(gravity.y-t.y)<1e-5f&&fabsf(gravity.z-t.z)<1e-5f);
  }
+ PoseWindow stationary;std::normal_distribution<float> noise(0,.02f);
+ for(int i=0;i<600;i++){float a[3]={noise(generator),noise(generator),1+noise(generator)};float g[3]={.12f+noise(generator),noise(generator),noise(generator)};stationary.add(a,g);assert(stationary.check(a,g)==0);}
+ assert(stationary.gyroM2[0]/599>.0001f); // This realistic noise failed the former threshold.
+ assert(fabsf(stationary.gyroMean[0]-.12f)<.01f);
+ float a[3]={0,0,1},fast[3]={.7f,0,0};assert(stationary.check(a,fast)==1);
+ PoseWindow unstable;unsigned reason=0;
+ for(int i=0;i<50;i++){float g[3]={i%2?.12f:-.12f,0,0};unstable.add(a,g);reason=unstable.check(a,g);}
+ assert(reason==2);
+ PoseWindow shaking;
+ for(int i=0;i<50;i++){float b[3]={i%2?.15f:-.15f,0,1},g[3]={0,0,0};shaking.add(b,g);reason=shaking.check(b,g);}
+ assert(reason==3);
+ float invalid[3]={0,0,0},zero[3]={0,0,0};assert(stationary.check(invalid,zero)==4);
+ std::cout<<"Passed stationary-noise regression, bias averaging, and movement rejection.\n";
  Q result;assert(!frameFromPoses({0,0,1},{0,0,1},result));assert(!frameFromPoses({0,0,1},{0,0,-1},result));assert(!frameFromPoses({0,0,0},{1,0,0},result));
  std::cout<<"Passed 2000 arbitrary sensor mounts, T-pose initialization, and degenerate-pose rejection.\n";
 }

@@ -47,7 +47,7 @@ Secure one MPU6050 to the **right bicep** and the other to the **right forearm**
 
 The firmware averages gravity and gyro readings for each pose, detects movement, and constructs a separate sensor-to-world mounting frame for each IMU. No hard-coded sensor axis is required. It learns gyro bias from both captures. The two known poses resolve the mounting orientation relative to your body; they do not measure compass heading, body translation, or arm length. Enter your arm lengths separately.
 
-The first capture must be arm-down and the second a sideways right-arm T-pose. Both measured gravity directions must be roughly perpendicular. Similar/opposite poses are rejected. A bad T capture can be retried without recapturing arm-down; **Cancel / start over** discards both. Movement resets the three-second window. A capture times out after 20 seconds, allowing a retry. Minor gravity magnitude variation is tolerated; the old fixed -X gravity requirement is removed.
+The first capture must be arm-down and the second a sideways right-arm T-pose. Both measured gravity directions must be roughly perpendicular. Similar/opposite poses are rejected. A bad T capture can be retried without recapturing arm-down; **Cancel / start over** discards both. Stability is evaluated throughout the capture using numerically stable running variance. Gyro standard deviation up to 0.05 rad/s and acceleration standard deviation up to 0.08 g are tolerated; obvious rotation or invalid acceleration still resets the three-second window. A restart identifies the upper-arm or forearm sensor and its reason on screen and in Serial Monitor. A capture times out after 20 seconds, allowing a retry. Minor gravity magnitude variation is tolerated; the old fixed -X gravity requirement is removed.
 
 Two-pose calibration is required after startup or disconnection. The old startup bypass is removed. Sensor mounting frames and biases are kept in RAM. Recalibrate if a sensor slips, temperature changes noticeably, or yaw drifts. Six-axis MPU6050 sensors still cannot correct yaw drift indefinitely. Remain upright and avoid twisting your torso between captures.
 
@@ -85,9 +85,11 @@ Control `0x01` starts a fresh arm-down capture; `0x02` captures T-pose after a s
 |---|---|
 | 0–1 | uint16 little-endian notification sequence |
 | 2 | flags: bit0 calibrated, bit1 capturing, bit2 sensor fault, bit3 rejected, bit4 arm-down saved/T next, bit5 capturing T, bit6 invalid pose geometry, bit7 two-pose firmware |
-| 3 | calibration percent, 0–100 |
+| 3 | 0–100: capture percent; 129–136: restart diagnostic codes |
 | 4–11 | bicep quaternion w,x,y,z; signed int16 LE divided by 32767 |
 | 12–19 | forearm quaternion w,x,y,z; same encoding |
+
+Diagnostic codes 129–132 identify upper-arm rotation, gyro instability, acceleration instability, or invalid acceleration range. Codes 133–136 mean the same issues for the forearm. Diagnostic codes are displayed as messages, never percentages.
 
 Firmware sends reference-relative world rotations. Internal axes are X right, Y forward, Z up. Browser maps them to Three.js by conjugation with a -90° X rotation (X right, Y up, Z backward).
 
