@@ -72,7 +72,7 @@ export function createLobbyAvatar(renderer,anchor){
   if(live||tracking.demo){u.copy(tracking.qu);f.copy(tracking.qf);}else if(!tracking.connected||!(tracking.flags&1)){u.slerp(reference,.13);f.slerp(reference,.13);}
   avatar.pose(u,f,tracking.upperLen,tracking.lowerLen);
   avatar.head.rotation.y=Math.sin(now*.00045)*.035;
-  const label=document.getElementById('avatarLabel');label.textContent=live?'LIVE · RIGHT ARM':tracking.demo?'DEMO MOTION':tracking.connected&&!fresh?'TRACKING PAUSED':fresh?'MATCH THE REFERENCE POSE':'YOUR MOTION AVATAR';
+  const label=document.getElementById('avatarLabel');label.textContent=tracking.demo?'Demo':tracking.connected&&!fresh?'Tracking paused':'';
   ring.material.color.set(live?'#a9dfb2':'#eec489');
   const x=stage.left-screen.left,y=screen.bottom-stage.bottom;
   camera.aspect=stage.width/stage.height;camera.position.set(0,1.04,camera.aspect<.65?3.8:3.2);camera.lookAt(0,.86,0);camera.updateProjectionMatrix();

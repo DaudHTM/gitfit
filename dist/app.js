@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createArcade} from './game.js';
+import {createArcade} from './game.js?v=minimal';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap,calibrationView} from './protocol.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#162023');$('viewport').prepend(renderer.domElement);
@@ -9,18 +9,20 @@ const trackingSamples=[];let motionSequence=null,motionClock=0,motionArrival=0;
 let device=null,control=null,stream=null,busy=false,demo=false,last=0,seq=null,lost=0,count=0,rateStart=performance.now(),latestFlags=0,calPending=false,calDeadline=0,calCommand=0,calibrationMode=false;
 function renderCalibration(flags,progress=0,reason=0){
  const v=calibrationView(flags,progress,calPending,reason);
- const showPose=calibrationMode||!!(flags&128);
- $('calStep').textContent=v.ready?'ARM IN SYNC':showPose?`POSE ${v.step} OF 2`:'MEET YOUR PLAYER';
- $('calTitle').textContent=v.ready?'You’re ready to move.':showPose?v.title:'Made to move with you.';
- $('calInstructions').textContent=!showPose&&!v.ready?'Connect your right arm, then calibrate in two simple poses.':v.ready?'You can move your arm now. Recalibrate if either sensor slips.':v.step===2?'Extend your right arm sideways at shoulder height, elbow straight and palm toward the floor. Hold comfortably for 3 seconds. Small shakes are okay.':'Stand upright, right arm straight at your side, palm toward your thigh. Hold comfortably for 3 seconds. Small shakes are okay.';
+ const showPose=!v.ready&&!(flags&4)&&(calibrationMode||!!(flags&128));
+ $('poseInstructions').hidden=!showPose;
+ $('calTitle').textContent=showPose?v.title:'';
+ $('calInstructions').textContent=!showPose?'':v.step===2?'Right arm sideways at shoulder height, elbow straight, palm down. Hold for 3 seconds.':'Right arm at your side, palm toward your thigh. Hold for 3 seconds.';
  $('calibrate').textContent=showPose||v.ready?v.button:'Calibrate';$('calibrate').disabled=v.disabled;
- $('calStatus').textContent=flags?v.status:'Connect your arm to calibrate.';$('calProgress').value=v.capturing?progress:v.ready?100:0;
+ const needsStatus=flags&&(calPending||v.capturing||reason||!!(flags&76)||!(flags&128));
+ $('calStatus').textContent=needsStatus?v.status:'';
+ $('calProgress').hidden=!v.capturing;$('calProgress').value=v.capturing?progress:0;
  $('cancelCalibration').hidden=!v.cancel;$('cancelCalibration').disabled=calPending;
  $('calibrationPanel').classList.toggle('t-pose',v.step===2);
 }
 function message(s){$('message').textContent=s;if(s.startsWith('Connection failed')||s.startsWith('Open this page'))$('setupDialog').showModal();}
 $('connectInSetup').onclick=()=>$('connect').click();
-function reset(){trackingSamples.length=0;motionSequence=null;motionArrival=0;$('connectInSetup').textContent='Connect ESP32';control=null;stream=null;busy=false;last=0;seq=null;count=0;lost=0;latestFlags=0;calPending=false;$('connect').disabled=false;$('connect').textContent='Connect ESP32 ↗';$('connection').textContent='Arm offline';$('openSetup').textContent='Connect arm ↗';calibrationMode=false;$('mode').textContent='PREVIEW';$('calibrate').disabled=true;renderCalibration(0);$('calStatus').textContent='Connect to begin two-pose calibration.';$('upperState').textContent=$('lowerState').textContent='Offline';$('rate').textContent=$('age').textContent=$('lost').textContent='—';$('demo').disabled=false;}
+function reset(){trackingSamples.length=0;motionSequence=null;motionArrival=0;$('connectInSetup').textContent='Connect ESP32';control=null;stream=null;busy=false;last=0;seq=null;count=0;lost=0;latestFlags=0;calPending=false;$('connect').disabled=false;$('connect').textContent='Connect ESP32 ↗';$('connection').textContent='Arm offline';$('openSetup').textContent='Connect arm ↗';calibrationMode=false;$('mode').textContent='PREVIEW';$('calibrate').disabled=true;renderCalibration(0);$('upperState').textContent=$('lowerState').textContent='Offline';$('rate').textContent=$('age').textContent=$('lost').textContent='—';$('demo').disabled=false;}
 function receive(e){try{const p=decode(e.target.value);const now=performance.now();lost+=sequenceGap(seq,p.sequence);seq=p.sequence;last=now;count++;latestFlags=p.flags;
  for(const [i,q] of [qu,qf].entries()){const a=p.qs[i];q.set(a[1],a[2],a[3],a[0]).premultiply(basis).multiply(basisInv).normalize()}
  const delta=motionSequence===null?0:(p.sequence-motionSequence+65536)%65536;

@@ -24,3 +24,7 @@ Publishing remains blocked because the existing Sites project returns NOT_FOUND 
 ## Single-game selector follow-up
 
 Replaced the six-button grid with one game name, category and position counter between Previous/Next buttons. Verified all six choices in order, wrapping in both directions, keyboard navigation, and matching scene titles. The same selection function continues to update the 3D world and launch the selected game. Desktop and mobile layout checked; no new runtime errors.
+
+## Minimal lobby follow-up
+
+Removed slogans, game category tags, duplicate titles, idle avatar labels, empty calibration progress and zero-state goal text. Moved input mode and best score into Settings. Kept pose instructions, capture progress, errors and stale/demo indicators when relevant. Removed the pause-screen tagline and filler sentence. Browser checks covered settings, selecting/launching Sword Arena, pause/return, the connection dialog, and the 390-pixel mobile layout without overflow. Existing calibration state tests pass; firmware was unchanged.

@@ -12,3 +12,22 @@
 .game-carousel button:hover{background:#e9c08a22;border-color:#e9c08a9c;color:#fff1da}.game-carousel button:active{transform:scale(.94)}
 .game-choice{min-width:0;text-align:center}.game-choice strong{font-size:18px;font-weight:500;letter-spacing:-.4px;color:#fff0db}.game-choice>div{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:5px 12px;margin-top:7px;font-size:8px;letter-spacing:1px;color:#a8bdbd}#selectedGameNumber{color:#dec39a;white-space:nowrap}
 @media(max-width:780px){.game-carousel{gap:9px;padding:13px 0}.game-choice strong{font-size:17px}.game-choice>div{font-size:7px;gap:4px 8px}}
+
+/* Keep the lobby quiet until a control or calibration needs attention. */
+.game-shell .play-button{margin-bottom:22px}
+.game-shell #lobbyNotice{min-height:0;margin:-10px 0 18px;line-height:1.5}
+.game-shell #lobbyNotice:empty,.game-shell #avatarLabel:empty,.game-shell #calStatus:empty,.game-shell #workoutStatus:empty,.overlay-card p:empty{display:none}
+.game-shell .game-choice h1{font-size:22px;line-height:1.2;font-weight:500;letter-spacing:-.6px;margin:0;max-width:none}
+.game-shell .game-choice>div{margin-top:8px}
+.game-shell .lobby-session{gap:26px;margin-top:24px}
+.game-shell .lobby-session strong{font-size:22px}
+.game-shell .lobby-bottom{justify-content:flex-end}
+.game-shell .pose-copy{min-height:0;padding:0 0 16px}
+.game-shell .pose-copy h2{font-size:22px;margin:0 0 9px}
+.game-shell .pose-copy p{max-width:310px;margin:auto}
+.game-shell #avatarLabel{margin:0 0 12px}
+.game-shell #calStatus{min-height:0}
+.game-shell .avatar-buttons{margin-top:12px}
+.settings-panel .control-choice{display:block;margin:0 0 18px}.settings-panel .control-choice label{margin-bottom:8px}.settings-panel .control-choice select{width:100%;max-width:none;font-size:12px;padding:9px}
+.settings-best{display:flex;justify-content:space-between;font-size:12px;margin-bottom:18px;color:#bfcac6}.settings-best b{font-weight:400}
+@media(max-width:780px){.game-shell .game-choice h1{font-size:20px}.game-shell .lobby-player{height:350px}.game-shell .lobby-player:has(.pose-copy:not([hidden])){height:435px}.game-shell .play-button{margin-bottom:20px}}
