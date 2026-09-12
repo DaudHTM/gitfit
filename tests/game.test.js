@@ -1,0 +1,5 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {PunchTracker,sweptHit,strike} from '../dist/game-logic.js';
+test('fast punches sweep through a target; misses stay misses',()=>{assert.equal(sweptHit([0,1,0],[0,1,-1],[0,1,-.5],.15),true);assert.equal(sweptHit([.5,1,0],[.5,1,-1],[0,1,-.5],.15),false)});
+test('one punch cannot hit twice; retract permits another strike',()=>{const p=new PunchTracker();p.sample([0,1,0],100);assert.ok(p.sample([0,1,-.2],120));p.consume();assert.equal(p.sample([0,1,-.4],140),null);assert.equal(p.sample([0,1,-.4],160),null);assert.equal(p.sample([0,1,-.2],180),null);assert.ok(p.sample([0,1,-.4],200));});
+test('zombie dies on second distinct strike only',()=>{const z={hp:2};assert.equal(strike(z),false);assert.equal(z.hp,1);assert.equal(strike(z),true);assert.equal(z.hp,0);assert.equal(strike(z),false);});
+test('stale sample cannot create a phantom punch',()=>{const p=new PunchTracker();p.sample([0,1,0],100);assert.equal(p.sample([0,1,-1],500),null);});

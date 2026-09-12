@@ -1,1 +1,10 @@
-{"name":"armature-motion-lab","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.js","check":"node --check dist/app.js && node --check dist/protocol.js","start":"python3 -m http.server 5173 --bind 127.0.0.1 --directory dist"}}
+{
+  "name": "armature-motion-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check dist/app.js && node --check dist/protocol.js && node --check dist/game.js && node --check dist/game-logic.js",
+    "start": "python3 -m http.server 5173 --bind 127.0.0.1 --directory dist"
+  }
+}

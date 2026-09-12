@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createArcade} from './game.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap} from './protocol.js';
 const $=id=>document.getElementById(id);
@@ -34,8 +35,9 @@ $('connect').onclick=async()=>{if(busy)return;if(device?.gatt.connected){device.
 $('calibrate').onclick=async()=>{if(!control)return;calPending=true;calDeadline=performance.now()+5000;$('calibrate').disabled=true;$('calStatus').textContent='Waiting for ESP32…';try{await control.writeValueWithResponse(new Uint8Array([1]))}catch(err){calPending=false;$('calibrate').disabled=false;message(`Calibration failed: ${err.message}`)}};
 $('demo').onclick=()=>{demo=!demo;qu.identity();qf.identity();$('mode').textContent=demo?'DEMO':'PREVIEW';$('demo').textContent=demo?'Stop demo':'Play demo';message(demo?'Simulated movement. Connect the ESP32 for live tracking.':'Connect your ESP32 to start live tracking.');};
 const observer=new ResizeObserver(()=>{const r=$('viewport').getBoundingClientRect();camera.aspect=r.width/r.height;camera.updateProjectionMatrix();renderer.setSize(r.width,r.height)});observer.observe($('viewport'));
+const arcade=createArcade(renderer,()=>({qu,qf,upperLen,lowerLen,last,flags:latestFlags,calPending,connected:!!device?.gatt.connected}));
 const down=new THREE.Vector3(0,-1,0),u=new THREE.Vector3(),f=new THREE.Vector3();let uiTime=0;
-renderer.setAnimationLoop(now=>{if(demo){qu.setFromEuler(new THREE.Euler(.15*Math.sin(now/1300),0,.32+.25*Math.sin(now/1900)));qf.copy(qu).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.85-.8*Math.sin(now/1100)))}
+renderer.setAnimationLoop(now=>{if(demo&&!arcade.active){qu.setFromEuler(new THREE.Euler(.15*Math.sin(now/1300),0,.32+.25*Math.sin(now/1900)));qf.copy(qu).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.85-.8*Math.sin(now/1100)))}
  upper.position.copy(shoulder);upper.quaternion.copy(qu);u.copy(down).applyQuaternion(qu);elbow.position.copy(shoulder).addScaledVector(u,upperLen);lower.position.copy(elbow.position);lower.quaternion.copy(qf);f.copy(down).applyQuaternion(qf);wrist.position.copy(elbow.position).addScaledVector(f,lowerLen);hand.position.copy(wrist.position).addScaledVector(f,.07);hand.quaternion.copy(qf);
  if(now-uiTime>100){uiTime=now;$('angle').innerHTML=`${Math.round(THREE.MathUtils.radToDeg(u.angleTo(f)))}<small>°</small>`;if(last){$('age').innerHTML=`${Math.round(now-last)}<small> ms</small>`;$('lost').textContent=lost;if(now-last>500){$('mode').textContent='STALE';$('calibrate').disabled=true;$('upperState').textContent=$('lowerState').textContent='No fresh data';}}if(now-rateStart>=1000){$('rate').innerHTML=last?`${Math.round(count*1000/(now-rateStart))}<small> Hz</small>`:'—';count=0;rateStart=now}if(calPending&&now>calDeadline){calPending=false;$('calibrate').disabled=false;$('calStatus').textContent='No calibration acknowledgement. Try again.'}}
- orbit.update();renderer.render(scene,camera)});
+ if(!arcade.tick(now)){orbit.update();renderer.render(scene,camera)}orbit.enabled=!arcade.active;});

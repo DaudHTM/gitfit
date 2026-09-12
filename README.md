@@ -2,6 +2,18 @@
 
 Three.js viewer + ESP32 firmware, with BLE notifications and stationary pose calibration. Open `dist/index.html` through a local web server (not file://), or use the hosted site. The viewer includes a demo without hardware. Full illustrated setup is in `dist/guide.html`.
 
+## Motion Arcade
+
+The home page now has **Zombie Boxing**, **Target Rush**, and the original **Motion Lab**. Connection and calibration are shared across modes; switching games keeps the BLE connection. Existing firmware/protocol is unchanged.
+
+- Zombie Boxing: enemies approach from ahead; two distinct right-arm punches defeat each one. Five health points, increasing waves, and 100 points per knockout. Enemies in reach attack every 2.3 seconds if not hit.
+- Target Rush: hit as many illuminated targets as possible in 45 seconds.
+- Live input: choose ESP32, connect and calibrate with the same arm-down pose. Raise your right arm and punch forward toward the screen; pull back at least 9 cm before punching again. Face the same direction used at calibration. The left arm is an animated-model guard, not independently tracked.
+- Keyboard / touch: an explicit simulation mode. Press Space or the Punch button. It never injects hits into live-input rounds.
+- Escape or Pause freezes a round. Stale/invalid tracking and hidden tabs automatically pause live play; press Resume after recovery. Switching mode or input starts a new round.
+
+Punch detection derives wrist motion from the two tracked segment orientations, uses a swept collision test, and requires outward velocity plus retraction between hits. It is a game heuristic, not a measured punching force. Keep space around you and use controlled movements. Live hardware punch feel still needs testing with the actual wearable.
+
 ## Hardware and wiring
 
 Assumption: a classic ESP32 DevKit/WROOM with Bluetooth LE, and two MPU6050 breakout modules (such as GY-521), not bare sensor chips. ESP32-S2 has no Bluetooth. Other ESP32 variants require checking their pinout and changing SDA_PIN/SCL_PIN.
