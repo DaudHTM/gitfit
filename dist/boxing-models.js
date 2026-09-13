@@ -91,7 +91,7 @@ export function createBoxingModels(scene) {
   for(const y of [.55,1,1.45]){const rope=part(environment,cylinder,y===1?'#9f735a':'#63747c',[x,y,-2.25],[.018,8.5,.018]);rope.rotation.x=Math.PI/2;}
  }
  for(let i=0;i<8;i++){for(const side of [-1,1]){part(environment,box,'#1b242b',[side*5,2,-i*2.5],[.32,4,.4]);part(environment,box,'#202c32',[side*6,2,-i*2.5],[2,4,.1]);part(environment,box,'#d4ddcc',[side*3.6,3.8,-i*2.5],[1.4,.04,.17]);}part(environment,box,'#2e3a40',[0,4.3,-i*2.5],[11,.12,.15]);}
- const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;const ctx=canvas.getContext('2d');ctx.fillStyle='#172029';ctx.fillRect(0,0,1024,512);ctx.textAlign='center';ctx.fillStyle='#d5c0a1';ctx.font='700 100px sans-serif';ctx.fillText('DEAD AHEAD',512,235);ctx.font='28px sans-serif';ctx.fillStyle='#88999e';ctx.fillText('ARMATURE   /   SURVIVE THE ROUND',512,305);
+ const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;const ctx=canvas.getContext('2d');ctx.fillStyle='#172029';ctx.fillRect(0,0,1024,512);ctx.textAlign='center';ctx.fillStyle='#d5c0a1';ctx.font='700 100px sans-serif';ctx.fillText('DEAD AHEAD',512,235);ctx.font='28px sans-serif';ctx.fillStyle='#88999e';ctx.fillText('GITFIT   /   SURVIVE THE ROUND',512,305);
  const sign=new T.Mesh(new T.PlaneGeometry(4.2,2.1),new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas)}));sign.position.set(0,2.5,-9);environment.add(sign);
  const key=new T.PointLight('#ffce9e',11,11,2);key.position.set(-1.5,3.3,1);environment.add(key);const rim=new T.PointLight('#74bcdf',18,15,2);rim.position.set(1.8,3,-4);environment.add(rim);
  batchStaticMeshes(T,environment);

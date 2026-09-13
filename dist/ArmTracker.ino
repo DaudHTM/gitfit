@@ -182,7 +182,7 @@ void sendPacket(){uint8_t b[20]={};b[0]=sequence&255;b[1]=sequence>>8;sequence++
 void setup(){Serial.begin(115200);Wire.begin(SDA_PIN,SCL_PIN,400000);Wire.setTimeOut(5);delay(100);bool ok=true;for(auto &s:imus){bool found=initImu(s);Serial.printf("MPU 0x%02x: %s\n",s.addr,found?"OK":"FAILED");ok&=found;}if(!ok){Serial.println("Fix wiring and reset ESP32.");while(true)delay(1000);}delay(100);
 calibrated=false;
 Serial.println("Two-pose calibration required: arm down, then right-arm T-pose.");
- NimBLEDevice::init("Armature-ESP32");server=NimBLEDevice::createServer();server->setCallbacks(&serverCallbacks);auto service=server->createService(SERVICE);dataCharacteristic=service->createCharacteristic(DATA,NIMBLE_PROPERTY::NOTIFY);auto control=service->createCharacteristic(CONTROL,NIMBLE_PROPERTY::WRITE);control->setCallbacks(&controlCallbacks);service->start();auto adv=NimBLEDevice::getAdvertising();adv->setName("Armature-ESP32");adv->addServiceUUID(SERVICE);adv->enableScanResponse(true);adv->start();
+ NimBLEDevice::init("GitFit-ESP32");server=NimBLEDevice::createServer();server->setCallbacks(&serverCallbacks);auto service=server->createService(SERVICE);dataCharacteristic=service->createCharacteristic(DATA,NIMBLE_PROPERTY::NOTIFY);auto control=service->createCharacteristic(CONTROL,NIMBLE_PROPERTY::WRITE);control->setCallbacks(&controlCallbacks);service->start();auto adv=NimBLEDevice::getAdvertising();adv->setName("GitFit-ESP32");adv->addServiceUUID(SERVICE);adv->enableScanResponse(true);adv->start();
  Serial.println("Ready. Connect in Chrome, then calibrate.");}
 void loop(){
   static uint32_t previous=micros(),sent=micros();uint32_t now=micros();if(uint32_t(now-previous)<5000){

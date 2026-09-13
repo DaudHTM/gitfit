@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {FrameBudget,writeText} from './frame-budget.js';
-import {createArcade} from './game.js?v=focus-pass2';
+import {createArcade} from './game.js?v=gitfit-brand1';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap,calibrationView} from './protocol.js';
 const $=id=>document.getElementById(id);
 const frameBudget=new FrameBudget(devicePixelRatio);
