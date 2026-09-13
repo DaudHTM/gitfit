@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createArcade} from './game.js?v=minimal';
+import {createArcade} from './game.js?v=immersion2';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap,calibrationView} from './protocol.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#162023');$('viewport').prepend(renderer.domElement);

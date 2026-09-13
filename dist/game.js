@@ -1,12 +1,14 @@
 import * as T from 'three';
 import {sweptHit,strike,nextOpponent,punchExtension} from './game-logic.js';
-import {ActivityTracker,createSound} from './activity.js';
-import {GAMES,createExtraGames} from './extra-games.js';
+import {ActivityTracker} from './activity.js';
+import {createSound} from './sound.js?v=immersion2';
+import {createImpactEffects} from './impact-effects.js';
+import {GAMES,createExtraGames} from './extra-games.js?v=immersion2';
 import {TrajectoryPunchTracker,practiceStroke} from './motion.js';
 import {setupFullscreen} from './fullscreen.js';
 import {createWorldDetails} from './world-details.js';
 import {createAvatar,createLobbyAvatar} from './avatar.js?v=minimal';
-import {createBoxingModels} from './boxing-models.js';
+import {createBoxingModels} from './boxing-models.js?v=immersion2';
 const $=id=>document.getElementById(id);
 const GAME_ORDER=['zombies','bird','saber','sword','shield','targets'];
 export function createArcade(renderer,getTracking){
@@ -44,11 +46,14 @@ export function createArcade(renderer,getTracking){
  rig.rightHand.visible=rig.leftHand.visible=false;
  const leftElbow=new T.Vector3(-.29,1.10,-.15);bone(leftUpper,leftShoulder,leftElbow);bone(leftLower,leftElbow,leftGlove.position);
  const elbow=new T.Vector3(),fist=new T.Vector3(),down=new T.Vector3(0,-1,0),practiceUpper=new T.Quaternion(),practiceLower=new T.Quaternion();
- const enemies=[],effects=[];let targetScore=0;let target=null,elapsed=0,nextSpawn=0,kills=0,hits=0,lives=5,wave=1,active=false,mode='zombies',state='menu',input='live',lastFrame=0,practiceStart=-10000,practiceClock=0,feedbackUntil=0;
- const detector=new TrajectoryPunchTracker(),sound=createSound(),activity=new ActivityTracker();
+ const enemies=[];let targetScore=0;let target=null,elapsed=0,nextSpawn=0,kills=0,hits=0,lives=5,wave=1,active=false,mode='zombies',state='menu',input='live',lastFrame=0,practiceStart=-10000,practiceClock=0,feedbackUntil=0;
+ const detector=new TrajectoryPunchTracker(),sound=createSound(),activity=new ActivityTracker(),impactFx=createImpactEffects(scene);
  const extra=createExtraGames(scene,mesh,{box:boxGeo,sphere:sphereGeo},feedback,sound);let extraResult=null,action=false,shake=0,best={},focus=null,lastWhoosh=-1000,combo=0,lastHit=-1000;const cameraAim=new T.Vector3(.1,1.3,-2.3);
  $('openSetup').onclick=()=>{pause('Device setup is open. Resume when you are ready.');$('setupDialog').showModal();};$('closeSetup').onclick=()=>$('setupDialog').close();
- $('cameraMotion').checked=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');$('cameraMotion').checked=$('impactEffects').checked=!reducedMotion.matches;impactFx.setEnabled($('impactEffects').checked);
+ try{const saved=JSON.parse(localStorage.getItem('armature-audio')||'null');if(saved){$('musicVolume').value=Number.isFinite(saved.music)?Math.min(100,Math.max(0,saved.music)):48;$('effectsVolume').value=Number.isFinite(saved.effects)?Math.min(100,Math.max(0,saved.effects)):80;}}catch{}
+ function audioSettings(){sound.setMusicVolume(Number($('musicVolume').value)/100);sound.setEffectsVolume(Number($('effectsVolume').value)/100);try{localStorage.setItem('armature-audio',JSON.stringify({music:Number($('musicVolume').value),effects:Number($('effectsVolume').value)}));}catch{}}
+ audioSettings();$('musicVolume').oninput=$('effectsVolume').oninput=()=>{sound.unlock();audioSettings();};$('impactEffects').onchange=()=>impactFx.setEnabled($('impactEffects').checked);
  function workoutUI(){const goal=Number($('workoutGoal').value)*60;$('workoutProgress').max=goal;$('workoutProgress').value=activity.seconds;const calories=Number($('calorieGoal').value);$('calorieProgress').max=calories;$('calorieProgress').value=activity.kcal;$('workoutStatus').textContent=activity.seconds>=goal&&activity.kcal>=calories?'Targets reached':''; $('workoutProgress').closest('.goal-lines').hidden=activity.seconds===0;$('calories').textContent=activity.kcal.toFixed(1);$('activeTime').textContent=(activity.seconds/60).toFixed(1)+' min';}
  $('workoutGoal').onchange=$('calorieGoal').onchange=workoutUI;
  try{best=JSON.parse(localStorage.getItem('armature-bests')||'{}');$('weight').value=localStorage.getItem('armature-weight')||70;}catch{}
@@ -58,19 +63,18 @@ export function createArcade(renderer,getTracking){
 
  function zombie(z,index){const e=boxing.fighter(index);e.root.position.set(.16,0,z);e.hp=e.maxHp=100;enemies.push(e);return e;}
  function removeObject(root){scene.remove(root)}
- function clear(){const buffered=getTracking().samples;if(buffered)buffered.length=0;$('hitFeedback').textContent='';$('hitFeedback').classList.remove('show');$('gameDetail').textContent='';focus=null;combo=0;for(const e of enemies)removeObject(e.root);enemies.length=0;for(const e of effects)removeObject(e.mesh);effects.length=0;if(target){removeObject(target.root);target=null}detector.reset();}
+ function clear(){impactFx.clear();const buffered=getTracking().samples;if(buffered)buffered.length=0;$('hitFeedback').textContent='';$('hitFeedback').classList.remove('show');$('gameDetail').textContent='';focus=null;combo=0;for(const e of enemies)removeObject(e.root);enemies.length=0;if(target){removeObject(target.root);target=null}detector.reset();}
  function practiceTarget(){if(target)removeObject(target.root);const root=new T.Group();scene.add(root);const x=input==='practice'?.20:[.18,.02,.28][hits%3],y=input==='practice'?1.30:[1.30,1.12,1.43][hits%3];root.position.set(x,y,-.53);mesh(sphereGeo,'#d8ff87',root,[0,0,0],[.16,.16,.06]);mesh(sphereGeo,'#33462d',root,[0,0,.05],[.105,.105,.02]);mesh(sphereGeo,'#d8ff87',root,[0,0,.075],[.04,.04,.02]);const ring=new T.Mesh(new T.TorusGeometry(.195,.012,6,32),material('#ffca90'));root.add(ring);target={root,ring,born:elapsed};}
- function feedback(text){shake=.045;sound.play(text.includes('−')?'hurt':text.includes('KNOCKOUT')?'win':'hit');$('hitFeedback').textContent=text;feedbackUntil=performance.now()+650;$('hitFeedback').classList.add('show');}
- function sparks(point,color){for(let i=0;i<10;i++){const m=mesh(boxGeo,color,scene,point.toArray(),[.025,.025,.025]);effects.push({mesh:m,velocity:new T.Vector3((Math.random()-.5)*2,Math.random()*2,(Math.random()-.5)*2),life:.45});}}
+ function feedback(text,{kind='punch',point=fist,power=1,direction=null}={}){power=T.MathUtils.clamp(power,.3,1.5);shake=Math.max(shake,kind==='miss'?0:mode==='bird'?.009:.022+power*.024);sound.play(kind,{power,pan:T.MathUtils.clamp(point.x*.65,-.7,.7)});if(kind!=='miss')impactFx.burst(point,kind,power,direction);$('hitFeedback').textContent=text;$('hitFeedback').dataset.kind=kind;feedbackUntil=performance.now()+(kind==='knockout'?950:650);$('hitFeedback').classList.add('show');if($('impactEffects').checked&&!reducedMotion.matches)$('hitFeedback').animate([{transform:`translateY(5px) scale(${1.03+power*.04})`},{transform:'translateY(0) scale(1)'}],{duration:220,easing:'ease-out'});}
  function overlay(title,text,button){$('gameOverlay').hidden=false;$('overlayTitle').textContent=title;$('overlayText').textContent=text;$('startGame').textContent=button;}
  function liveReady(){const t=getTracking();return t.connected&&t.last&&performance.now()-t.last<250&&(t.flags&1)&&!(t.flags&6)&&!t.calPending;}
  function ready(){return input==='practice'||liveReady()}
  function pause(reason=''){if(state!=='playing')return;state='paused';sound.stop();extra.suspend();action=false;detector.reset();overlay('Paused',reason,'Resume round');$('pauseGame').textContent='Resume';}
- function finish(){const score=extraResult?.score??(mode==='zombies'?kills*100:targetScore);best[mode]=Math.max(best[mode]||0,score);try{localStorage.setItem('armature-bests',JSON.stringify(best))}catch{}state='over';$('opponentHud').hidden=true;detector.reset();overlay(mode==='zombies'?'Run complete.':(extraResult?.hp<=0?'Run complete.':'Time’s up.'),mode==='zombies'?`${kills} zombies defeated · ${hits} hits landed · wave ${wave}`:`${hits} targets hit in 45 seconds.`, 'Play again');$('overlayText').textContent=`Score ${score} · Best ${best[mode]} · ${extraResult?extraResult.combo+' combo':hits+' hits'}. Session: ${activity.kcal.toFixed(1)} estimated kcal.`;$('pauseGame').disabled=true;}
+ function finish(quiet=false){sound.stop();if(!quiet)sound.play((mode==='zombies'?lives<=0:extraResult?.hp<=0)?'defeat':'finish');const score=extraResult?.score??(mode==='zombies'?kills*100:targetScore);best[mode]=Math.max(best[mode]||0,score);try{localStorage.setItem('armature-bests',JSON.stringify(best))}catch{}state='over';$('opponentHud').hidden=true;detector.reset();overlay(mode==='zombies'?'Run complete.':(extraResult?.hp<=0?'Run complete.':'Time’s up.'),mode==='zombies'?`${kills} zombies defeated · ${hits} hits landed · wave ${wave}`:`${hits} targets hit in 45 seconds.`, 'Play again');$('overlayText').textContent=`Score ${score} · Best ${best[mode]} · ${extraResult?extraResult.combo+' combo':hits+' hits'}. Session: ${activity.kcal.toFixed(1)} estimated kcal.`;$('pauseGame').disabled=true;}
  function start(){sound.unlock();if(!ready()){if(active){$('overlayText').textContent='Tracking is not ready. Return to the lobby to reconnect or calibrate.';return;}$('lobbyNotice').textContent=getTracking().connected?'Calibrate your arm before playing.':'Connect your arm, or choose Practice in Settings.';return;}active=true;document.body.classList.add('in-game','arcade-active');$('viewport').scrollTop=0;$('settings').open=false;$('gameHud').hidden=false;$('gameToolbar').hidden=false;fullscreen.enter();
  if(state!=='paused'){clear();elapsed=0;nextSpawn=2.5;kills=hits=targetScore=0;lives=5;wave=1;extra.reset(mode);extraResult=null;if(mode==='zombies')zombie(-2.1,0);else if(mode==='targets')practiceTarget();}
- detector.reset();practiceStart=-10000;extra.group.visible=!['zombies','targets'].includes(mode);state='playing';$('viewport').focus({preventScroll:true});sound.play('bell');$('gameOverlay').hidden=true;$('pauseGame').disabled=false;$('pauseGame').textContent='Pause';}
- function select(next){sound.stop();mode=next;world.select(next);boxing.environment.visible=next==='zombies';$('opponentHud').hidden=true;arena.visible=['saber','shield'].includes(next);strikeZone.visible=next==='saber';street.visible=!['bird','zombies','sword'].includes(next);sky.visible=next==='bird';scene.background.set(next==='bird'?'#9fcbd0':'#0b1018');scene.fog.color.copy(scene.background);scene.fog.density=next==='bird'?.025:.075;extra.reset(next);extraResult=null;player.visible=next!=='bird';active=false;state='menu';clear();elapsed=0;hits=kills=targetScore=0;lives=5;wave=1;document.body.classList.toggle('arcade-active',active);$('gameHud').hidden=!active;$('gameOverlay').hidden=!active;$('gameToolbar').hidden=!active;document.body.classList.remove('in-game');
+ detector.reset();practiceStart=-10000;extra.group.visible=!['zombies','targets'].includes(mode);state='playing';sound.setScene(mode,true,elapsed);$('viewport').focus({preventScroll:true});sound.play('bell');$('gameOverlay').hidden=true;$('pauseGame').disabled=false;$('pauseGame').textContent='Pause';}
+ function select(next){sound.setScene(next,false);mode=next;world.select(next);boxing.environment.visible=next==='zombies';$('opponentHud').hidden=true;arena.visible=['saber','shield'].includes(next);strikeZone.visible=next==='saber';street.visible=!['bird','zombies','sword'].includes(next);sky.visible=next==='bird';scene.background.set(next==='bird'?'#9fcbd0':'#0b1018');scene.fog.color.copy(scene.background);scene.fog.density=next==='bird'?.025:.075;extra.reset(next);extraResult=null;player.visible=next!=='bird';active=false;state='menu';clear();elapsed=0;hits=kills=targetScore=0;lives=5;wave=1;document.body.classList.toggle('arcade-active',active);$('gameHud').hidden=!active;$('gameOverlay').hidden=!active;$('gameToolbar').hidden=!active;document.body.classList.remove('in-game');
  const index=GAME_ORDER.indexOf(next);$('selectedGameName').textContent=GAMES[next].name;$('selectedGameNumber').textContent=`${String(index+1).padStart(2,'0')} / ${String(GAME_ORDER.length).padStart(2,'0')}`;
  const g=GAMES[next];
  $('lobbyNotice').textContent=input==='practice'?'Practice · calories paused':'';
@@ -78,18 +82,18 @@ export function createArcade(renderer,getTracking){
  camera.position.set(next==='bird'?3:3.3,next==='bird'?3:2.2,next==='bird'?5:5.4);cameraAim.set(0,next==='bird'?2:1.1,-3);camera.fov=57;
  $('pauseGame').disabled=true;
  }
- function changeGame(direction){if(active)return;const index=GAME_ORDER.indexOf(mode);select(GAME_ORDER[(index+direction+GAME_ORDER.length)%GAME_ORDER.length]);}
+ function changeGame(direction){if(active)return;sound.unlock();const index=GAME_ORDER.indexOf(mode);select(GAME_ORDER[(index+direction+GAME_ORDER.length)%GAME_ORDER.length]);sound.play('select');}
  $('previousGame').onclick=()=>changeGame(-1);$('nextGame').onclick=()=>changeGame(1);
  $('gamePicker').addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();changeGame(e.key==='ArrowLeft'?-1:1);}});
  $('playGame').onclick=$('startGame').onclick=start;
- function lobby(){if(state==='playing'||state==='paused')finish();fullscreen.exit();select(mode);$('playGame').focus();}
+ function lobby(){if(state==='playing'||state==='paused')finish(true);fullscreen.exit();select(mode);$('playGame').focus();}
  $('backLobby').onclick=$('overlayLobby').onclick=lobby;
  $('pauseGame').onclick=()=>state==='playing'?pause():state==='paused'?start():null;
  $('gameInput').onchange=()=>{input=$('gameInput').value;select(mode);$('practicePunch').hidden=input!=='practice';$('inputHint').textContent=input==='practice'?(mode==='bird'?'Space to flap · arrows / drag aim the flap':mode==='shield'?'Arrow keys or drag in scene':'Space or Strike · simulated arm'):'Live right arm · calibrated ESP32 required';};
- function practicePunch(){if(input==='practice'&&state==='playing'&&practiceClock-practiceStart>.8){action=true;practiceStart=practiceClock;sound.play('whoosh');}}
+ function practicePunch(){if(input==='practice'&&state==='playing'&&practiceClock-practiceStart>.8){action=true;practiceStart=practiceClock;if(mode!=='bird')sound.play(['sword','saber'].includes(mode)?'slashSwing':'whoosh',{power:.5+Number($('strikeEffort').value)*.25,pan:.3});}}
  $('practicePunch').onclick=practicePunch;
  window.addEventListener('keydown',e=>{if(e.code==='Escape')pause();if(e.code==='Space'&&!e.repeat&&active&&input==='practice'&&!/INPUT|SELECT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();practicePunch();}});
- document.addEventListener('visibilitychange',()=>{if(document.hidden)pause('The round paused while this tab was hidden.');});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){pause('The round paused while this tab was hidden.');sound.stop();}else if(!active)sound.setScene(mode,false);});
  function tick(now){const dt=lastFrame?Math.min((now-lastFrame)/1000,.05):0;lastFrame=now;world.tick(dt);
  const t=getTracking();const liveSamples=t.samples?.splice(0)||[];const qUpper=input==='practice'?practiceUpper:t.qu,qLower=input==='practice'?practiceLower:t.qf;
  if(state==='playing'){if(!ready())pause('Tracking paused. Reconnect or recalibrate, then resume when the signal is fresh.');else{elapsed+=dt;practiceClock+=dt;}}
@@ -111,35 +115,34 @@ export function createArcade(renderer,getTracking){
   const sweeps=[];
   if(input==='practice'&&stroke.phase!=='strike'){detector.reset();detector.sample(fist.toArray(),now);}else for(const sample of wristSamples){const sweep=detector.sample(sample.p,sample.time);if(sweep)sweeps.push(sweep);}
   if(sweeps.length){const move=sweeps.at(-1);$('strikeReadout').textContent=`${move.type.toUpperCase()} · ${move.peakSpeed.toFixed(1)} m/s est. · ${move.damage} damage`;}
-  if(sweeps.length&&input==='live'&&now-lastWhoosh>450){sound.play('whoosh');lastWhoosh=now;}
+  if(sweeps.length&&input==='live'&&now-lastWhoosh>450){if(['zombies','targets'].includes(mode))sound.play('whoosh',{power:Math.min(1.5,sweeps.at(-1).peakSpeed/2),pan:.3});lastWhoosh=now;}
   if(mode==='zombies'){
    wave=1+Math.floor(kills/5);if(elapsed>=nextSpawn&&enemies.filter(e=>!e.dead).length<4){zombie(-7,enemies.length+kills);nextSpawn=elapsed+Math.max(1.8,4.3-wave*.2);}
    const living=enemies.filter(e=>!e.dead).sort((a,b)=>b.root.position.z-a.root.position.z);
    living.forEach((e,i)=>{const limit=i?living[i-1].root.position.z-.85:-.68;e.root.position.z=Math.min(limit,e.root.position.z+dt*(.55+Math.min(wave,8)*.06));const approach=T.MathUtils.smoothstep(-e.root.position.z,1,5);e.root.position.x=.16+Math.sin(e.index*2.4)*.8*approach+Math.sin(elapsed*2+e.index)*.02;
-    e.flash=Math.max(0,e.flash-dt);boxing.animate(e,elapsed,dt);
-    if(i===0&&e.root.position.z<-1.1){const foot=Math.floor(elapsed*1.8);if(foot!==e.step){sound.play('step');e.step=foot;}}
-    if(e.root.position.z>=-.70){e.attack+=dt;if(e.attack>2.3){lives--;combo=0;e.attack=0;feedback('TOO CLOSE −1');$('viewport').classList.add('hurt');setTimeout(()=>$('viewport').classList.remove('hurt'),220);if(lives<=0)finish();}}else e.attack=0;
+    e.flash=Math.max(0,e.flash-dt);boxing.animate(e,elapsed,dt);if(i===0&&e.attack>1.55&&!e.warned){sound.play('growl',{pan:e.root.position.x*.5});e.warned=true;}if(e.attack<.3)e.warned=false;
+    if(i===0&&e.root.position.z<-1.1){const foot=Math.floor(elapsed*1.8);if(foot!==e.step){sound.play('step',{power:Math.max(.3,1+e.root.position.z/8),pan:e.root.position.x*.5});e.step=foot;}}
+    if(e.root.position.z>=-.70){e.attack+=dt;if(e.attack>2.3){lives--;combo=0;e.attack=0;feedback('TOO CLOSE −1',{kind:'hurt',point:new T.Vector3(0,1.45,-.3)});$('viewport').classList.add('hurt');setTimeout(()=>$('viewport').classList.remove('hurt'),220);if(lives<=0)finish();}}else e.attack=0;
    });
    focus=nextOpponent(enemies);$('opponentHud').hidden=!focus||state!=='playing';$('opponentName').textContent=focus?'OPPONENT '+(kills+1):'CLEAR';$('opponentCue').textContent=focus?(focus.attack>1.4?'Incoming swing':focus.root.position.z>-.8?'In reach · punch':'Closing in'):'';document.querySelectorAll('.opponent-bars i').forEach((bar,i)=>{const fraction=focus?T.MathUtils.clamp(focus.hp/focus.maxHp*2-i,0,1):0;bar.style.background=`linear-gradient(to right,#f3ba80 ${fraction*100}%,#ffffff26 ${fraction*100}%)`;});
    let landed=false;
    for(const sweep of sweeps){if(landed||state!=='playing')break;for(const e of living){const center=e.root.position.clone().add(new T.Vector3(0,1.32,.08));if(sweptHit(sweep.a,sweep.b,center.toArray(),.32)){
-    detector.consume();landed=true;hits++;combo=elapsed-lastHit<4?combo+1:1;lastHit=elapsed;e.flash=.2+sweep.damage*.002;e.attack=0;const dead=strike(e,sweep.damage);e.health.forEach((h,i)=>{h.scale.x=.13*T.MathUtils.clamp(e.hp/e.maxHp*2-i,0,1);});sparks(fist,'#ffd098');
+    detector.consume();landed=true;hits++;combo=elapsed-lastHit<4?combo+1:1;lastHit=elapsed;e.flash=.2+sweep.damage*.002;e.attack=0;const dead=strike(e,sweep.damage);e.health.forEach((h,i)=>{h.scale.x=.13*T.MathUtils.clamp(e.hp/e.maxHp*2-i,0,1);});const impactDirection=new T.Vector3().fromArray(sweep.b).sub(new T.Vector3().fromArray(sweep.a)).normalize();e.hitSide=impactDirection.x;e.hitLift=sweep.type==='uppercut'?1:0;
     $('strikeReadout').textContent=`${sweep.type.toUpperCase()} · ${sweep.peakSpeed.toFixed(1)} m/s est. · ${sweep.damage} damage`;
-    if(dead){kills++;e.dead=.001;feedback(`${sweep.type.toUpperCase()} · KNOCKOUT +100`);}else{e.root.position.z-=.10+sweep.damage*.0015;feedback(`${sweep.type.toUpperCase()} · −${sweep.damage} HP`);}break;
+    if(dead){kills++;e.dead=.001;feedback(`${sweep.type.toUpperCase()} · KNOCKOUT +100`,{kind:'knockout',point:center,power:sweep.damage/65,direction:impactDirection});}else{e.root.position.z-=.10+sweep.damage*.0015;feedback(`${sweep.type.toUpperCase()} · −${sweep.damage} HP`,{kind:'punch',point:center,power:sweep.damage/65,direction:impactDirection});}break;
    }}}
-   for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.dead){e.dead+=dt;e.root.rotation.x=-Math.min(Math.PI/2,e.dead*2.2);e.root.rotation.z=Math.sin(e.index+1)*e.dead*.3;e.root.position.z-=dt*.9;e.root.position.y=-Math.max(0,e.dead-.35)*.15;if(e.dead>1.1){removeObject(e.root);enemies.splice(i,1)}}}
+   for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.dead){e.dead+=dt;e.root.rotation.x=-Math.min(Math.PI/2,e.dead*2.2);e.root.rotation.z=(e.hitSide||Math.sin(e.index+1)*.4)*e.dead*.7;e.root.position.z-=dt*.9;e.root.position.y=-Math.max(0,e.dead-.35)*.15;if(e.dead>1.1){removeObject(e.root);enemies.splice(i,1)}}}
   }else if(mode==='targets'){
    if(target){target.ring.rotation.z=elapsed;target.ring.scale.setScalar(1+Math.sin(elapsed*5)*.06);}
-   for(const sweep of sweeps){if(target&&sweptHit(sweep.a,sweep.b,target.root.position.toArray(),.23)){detector.consume();hits++;const bullseye=sweptHit([sweep.a[0],sweep.a[1],0],[sweep.b[0],sweep.b[1],0],[target.root.position.x,target.root.position.y,0],.09);const points=(bullseye?150:100)+Math.max(0,Math.round(30-(elapsed-target.born)*5));targetScore+=points;sparks(target.root.position,'#d8ff87');feedback(`${bullseye?'BULLSEYE':'TARGET'} +${points}`);practiceTarget();break;}}
+   for(const sweep of sweeps){if(target&&sweptHit(sweep.a,sweep.b,target.root.position.toArray(),.23)){detector.consume();hits++;const bullseye=sweptHit([sweep.a[0],sweep.a[1],0],[sweep.b[0],sweep.b[1],0],[target.root.position.x,target.root.position.y,0],.09);const points=(bullseye?150:100)+Math.max(0,Math.round(30-(elapsed-target.born)*5));targetScore+=points;feedback(`${bullseye?'BULLSEYE':'TARGET'} +${points}`,{kind:'target',point:target.root.position,power:bullseye?1.2:.7});practiceTarget();break;}}
    if(elapsed>=45)finish();
   }else {extraResult=extra.tick(dt,fist,qLower,input==='practice',action,wristSamples);if(extraResult?.over)finish();}
 
  action=false;
  }
  activity.update(dt,{playing:state==='playing',live:input==='live',fresh:!!liveReady(),visible:!document.hidden,weight:Number($('weight').value),met:Number($('effort').value)});
- workoutUI();$('liveEnergy').textContent=activity.kcal.toFixed(1)+' kcal est.';
+ sound.update(Math.min(1,.2+(mode==='zombies'?wave*.07+combo*.06:(extraResult?.combo||0)*.07)),extraResult?.speed||0,state==='playing'?elapsed:null);workoutUI();$('liveEnergy').textContent=activity.kcal.toFixed(1)+' kcal est.';
  if(mode==='bird'&&state==='playing'){for(const decoration of sky.children.slice(1)){decoration.position.z+=dt*(extraResult?.speed||3);if(decoration.position.z>6)decoration.position.z-=54;}}
- for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.velocity.y-=dt*4;e.mesh.position.addScaledVector(e.velocity,dt);e.mesh.rotation.x+=dt*5;if(e.life<=0){removeObject(e.mesh);effects.splice(i,1)}}
  if(now>feedbackUntil)$('hitFeedback').classList.remove('show');
  $('gameScore').textContent=mode==='zombies'?String(kills*100):String(targetScore);$('roundLabel').textContent=mode==='zombies'?'WAVE':'SECONDS';$('gameRound').textContent=mode==='zombies'?String(wave):String(Math.max(0,Math.ceil(45-elapsed)));$('healthLabel').textContent=mode==='zombies'?'HEALTH':'HITS';$('gameHealth').textContent=mode==='zombies'?'●'.repeat(Math.max(0,lives))+'○'.repeat(5-Math.max(0,lives)):String(hits);
  $('gameState').textContent=state==='playing'?(input==='live'?'LIVE ARM':'KEYBOARD / TOUCH'):state.toUpperCase();
@@ -151,7 +154,7 @@ export function createArcade(renderer,getTracking){
  if(!active){
   player.visible=false;extra.group.visible=false;extra.preview(now);const travel=$('cameraMotion').checked?Math.sin(now*.00013)*.5:0;
   camera.position.set(mode==='bird'?3+travel:3.3+travel,mode==='bird'?3:2.2,mode==='bird'?5:5.4);camera.lookAt(0,mode==='bird'?2:1.1,-3);camera.fov=57;
-  const size=renderer.domElement.getBoundingClientRect();camera.aspect=size.width/size.height;camera.updateProjectionMatrix();renderer.render(scene,camera);lobbyAvatar.render(now,t);return true;
+  const size=renderer.domElement.getBoundingClientRect();camera.aspect=size.width/size.height;camera.updateProjectionMatrix();impactFx.tick(dt,camera,{effects:$('impactEffects').checked,paused:!!$('setupDialog').open});renderer.render(scene,camera);lobbyAvatar.render(now,t);return true;
  }
  player.visible=mode!=='bird';extra.group.visible=!['zombies','targets'].includes(mode);
  const motion=$('cameraMotion').checked;shake*=Math.exp(-dt*18);const view=$('cameraView').value;
@@ -162,10 +165,10 @@ export function createArcade(renderer,getTracking){
  bodyParts.forEach(part=>part.visible=view==='shoulder');
  if(mode==='bird'){aim.set(birdPos.x+(extraResult?.bank||0)*.3,birdPos.y,-6);extra.setView(view==='shoulder');}
  if(mode==='zombies'&&view==='director'&&motion&&focus){aim.set(focus.root.position.x*.55,1.34,Math.min(-1.7,focus.root.position.z));cp.x+=T.MathUtils.clamp(focus.root.position.x*.16,-.13,.13)+Math.sin(elapsed*.6)*.035;cp.y+=T.MathUtils.clamp((-focus.root.position.z-1)*.014,0,.07);}
- if(motion&&state==='playing'){cp.x+=Math.sin(now*.063)*shake*.35;cp.y+=Math.sin(elapsed*2)*.006;}
- camera.position.lerp(cp,1-Math.exp(-dt*7));cameraAim.lerp(aim,1-Math.exp(-dt*4));camera.lookAt(cameraAim);
- camera.fov=T.MathUtils.lerp(camera.fov,mode==='zombies'&&view==='director'&&motion?74+Math.min(2,shake*30):76,1-Math.exp(-dt*5));
- const size=renderer.domElement.getBoundingClientRect();camera.aspect=size.width/size.height;camera.updateProjectionMatrix();renderer.render(scene,camera);return true;
+ if(motion&&state==='playing'){cp.x+=Math.sin(now*.063)*shake*.45;cp.y+=Math.sin(elapsed*2)*.006+Math.cos(now*.047)*shake*.2;cp.z+=shake*.2;}
+ camera.position.lerp(cp,1-Math.exp(-dt*7));cameraAim.lerp(aim,1-Math.exp(-dt*4));camera.lookAt(cameraAim);if(motion&&state==='playing')camera.rotateZ(mode==='bird'?T.MathUtils.clamp(-(extraResult?.bank||0)*.01,-.045,.045):Math.sin(now*.032)*shake*.23);
+ camera.fov=T.MathUtils.lerp(camera.fov,mode==='zombies'&&view==='director'&&motion?74+Math.min(3,shake*45):76+(motion?mode==='bird'?Math.min(7,Math.max(0,(extraResult?.speed||3)-3)*1.2):shake*30:0),1-Math.exp(-dt*5));
+ const size=renderer.domElement.getBoundingClientRect();camera.aspect=size.width/size.height;camera.updateProjectionMatrix();strikeZone.scale.setScalar(1+($('impactEffects').checked?sound.pulse()*.065:0));impactFx.tick(dt,camera,{effects:$('impactEffects').checked,flight:mode==='bird',speed:extraResult?.speed||0,paused:state!=='playing'});renderer.render(scene,camera);return true;
  }
  select('zombies');return {tick,pause,get active(){return active}};
 }

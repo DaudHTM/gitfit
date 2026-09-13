@@ -69,10 +69,10 @@ export function createBoxingModels(scene) {
   const near=e.root.position.z>-.75,gait=time*(near?2:5.5)+e.index*1.7;
   const windup=T.MathUtils.smoothstep(e.attack,1.4,2.05),jab=T.MathUtils.smoothstep(e.attack,2.05,2.28);
   e.root.position.y=Math.abs(Math.sin(gait))*(near?.007:.024);
-  e.chest.rotation.z=Math.sin(gait)*.035+e.flash*.3;
+  e.chest.rotation.z=Math.sin(gait)*.035+e.flash*(e.hitSide||.3)*.6;
   e.chest.rotation.x=-windup*.09+jab*.3-e.flash*.7;
   e.head.rotation.z=.07+Math.sin(time*1.7+e.index)*.06;
-  e.head.rotation.x=-e.flash*.5;
+  e.head.rotation.x=-e.flash*(e.hitLift?1.2:.55);e.head.rotation.y=e.flash*(e.hitSide||0)*1.1;
   e.legs.forEach((l,j)=>{l.rotation.x=Math.sin(gait+j*Math.PI)*(near?.03:.27);l.userData.knee.rotation.x=Math.max(0,-Math.sin(gait+j*Math.PI))*.25;});
   e.arms.forEach((a,j)=>{a.rotation.x=-.55+Math.sin(gait+j*Math.PI)*.09-windup*.15-jab*(j?.5:.9);a.rotation.z=(j?1:-1)*(.12+windup*.12);a.userData.elbow.rotation.x=-.55-windup*.65+jab*.9;});
   e.jaw.position.y=-windup*.01;

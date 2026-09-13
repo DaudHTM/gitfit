@@ -8,6 +8,8 @@ The home page has **Zombie Boxing**, **Bird Flight**, **Neon Saber**, **Sword Ar
 
 - Zombie Boxing: enemies approach from ahead; each enemy has 100 HP, and faster right-arm strikes deal more damage (18–93 HP per hit). Five health points, increasing waves, and 100 points per knockout. Enemies in reach attack every 2.3 seconds if not hit.
 - Target Rush: hit as many illuminated targets as possible in 45 seconds.
+- Every game has its own original background score and layered action sounds. Boxing uses heavy percussion and punch/knockout layers; sword combat has metal clashes; Neon Saber runs at 120 BPM with a cut every second beat; flight pairs a quieter score with speed-responsive wind and wingbeats. Shield blocks and target/ring hits have their own cues.
+- Impacts add sparks, expanding rings, sword arcs, directional enemy recoil and brief camera response. Flight gains peripheral speed streaks. Settings contains separate Music and Sound effects volumes, Impact effects, and Camera motion. Volume settings survive reload. Music starts after Play or a game-selection click; Pause and hidden tabs stop the soundtrack. Reduced-motion preferences disable the optional impact and camera effects by default.
 - Live input: choose ESP32, connect and complete both calibration poses. Use straight forward jabs, lateral hook arcs, or upward uppercut arcs. Return to your guard or briefly settle between strikes. Face the same direction used at calibration. The left arm is an animated-model guard, not independently tracked.
 - Keyboard / touch: an explicit simulation mode. Press Space or the Punch button. It never injects hits into live-input rounds.
 - Escape or Pause freezes a round. Stale/invalid tracking and hidden tabs automatically pause live play; press Resume after recovery. Switching mode or input starts a new round.
@@ -18,7 +20,7 @@ Punch detection derives wrist motion from the two tracked segment orientations, 
 
 Assumption: a classic ESP32 DevKit/WROOM with Bluetooth LE, and two MPU6050 breakout modules (such as GY-521), not bare sensor chips. ESP32-S2 has no Bluetooth. Other ESP32 variants require checking their pinout and changing SDA_PIN/SCL_PIN.
 
-![Wiring](dist/wiring.svg)
+![Wiring](wiring.svg)
 
 | ESP32 | Bicep MPU6050 | Forearm MPU6050 |
 |---|---|---|
