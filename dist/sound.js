@@ -60,6 +60,7 @@ export function createSound(environment={}){
   const p=clamp(options.power??1,.25,1.6),pan=clamp(options.pan??0,-1,1),at=ctx.currentTime,variation=.94+Math.random()*.12;
   const t=(f,end,d,l,type='sine',delay=0)=>tone(f*variation,end*variation,d,l*p,type,at+delay,sfxBus,pan);
   const n=(d,f,l,band='lowpass',delay=0)=>noise(d,f,l*p,band,at+delay,sfxBus,pan);
+  if(kind==='challenge'){[72,76,81].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.3,.045,'sine',i*.065));return;}
   if(kind==='select'){t(420,600,.065,.08);return;}
   if(kind==='whoosh'||kind==='slashSwing'||kind==='flap'){n(kind==='flap'?.26:.18,kind==='slashSwing'?3200:1100,.12,'bandpass');if(kind==='flap')n(.22,350,.09);return;}
   if(kind==='hit'||kind==='punch'||kind==='knockout'){t(150,38,.17,.3);t(62,27,.23,.2);n(.075,2100,.25);n(.2,450,.1);if(kind==='knockout'){t(85,22,.48,.22);n(.38,950,.17);[57,60,64].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.42,.065,'triangle',.05+i*.085));}return;}

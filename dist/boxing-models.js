@@ -1,5 +1,6 @@
 import * as T from 'three';
-import {BOXING_STOP_Z} from './game-logic.js?v=spell-pass3';
+import {BOXING_STOP_Z} from './game-logic.js?v=results-pass2';
+import {batchStaticMeshes} from './scene-batch.js';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.
 export function createBoxingModels(scene) {
@@ -79,7 +80,7 @@ export function createBoxingModels(scene) {
   e.head.rotation.x=-e.flash*(e.hitLift?1.2:.55);e.head.rotation.y=e.flash*(e.hitSide||0)*1.1;
   e.legs.forEach((l,j)=>{l.rotation.x=Math.sin(gait+j*Math.PI)*(near?.03:.27);l.userData.knee.rotation.x=Math.max(0,-Math.sin(gait+j*Math.PI))*.25;});
   e.arms.forEach((a,j)=>{a.rotation.x=-.55+Math.sin(gait+j*Math.PI)*.09-windup*.15-jab*(j?.5:.9);a.rotation.z=(j?1:-1)*(.12+windup*.12);a.userData.elbow.rotation.x=-.55-windup*.65+jab*.9;});
-  e.jaw.position.y=-windup*.01;
+  e.jaw.position.y=-.09-windup*.01;
  }
  const environment=new T.Group();scene.add(environment);environment.visible=false;
  part(environment,box,'#212a30',[0,-.07,-5],[18,.12,26]);
@@ -93,6 +94,7 @@ export function createBoxingModels(scene) {
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;const ctx=canvas.getContext('2d');ctx.fillStyle='#172029';ctx.fillRect(0,0,1024,512);ctx.textAlign='center';ctx.fillStyle='#d5c0a1';ctx.font='700 100px sans-serif';ctx.fillText('DEAD AHEAD',512,235);ctx.font='28px sans-serif';ctx.fillStyle='#88999e';ctx.fillText('ARMATURE   /   SURVIVE THE ROUND',512,305);
  const sign=new T.Mesh(new T.PlaneGeometry(4.2,2.1),new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas)}));sign.position.set(0,2.5,-9);environment.add(sign);
  const key=new T.PointLight('#ffce9e',11,11,2);key.position.set(-1.5,3.3,1);environment.add(key);const rim=new T.PointLight('#74bcdf',18,15,2);rim.position.set(1.8,3,-4);environment.add(rim);
+ batchStaticMeshes(T,environment);
  function hitVolumes(e){
   e.root.updateMatrixWorld(true);
   const capsule=(node,a,b,radius)=>{const scale=node.getWorldScale(new T.Vector3());return {a:node.localToWorld(new T.Vector3(...a)).toArray(),b:node.localToWorld(new T.Vector3(...b)).toArray(),radius:radius*Math.max(scale.x,scale.z)};};

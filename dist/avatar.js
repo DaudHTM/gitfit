@@ -65,8 +65,11 @@ export function createLobbyAvatar(renderer,anchor){
  const platform=new T.Mesh(new T.CylinderGeometry(.51,.55,.055,64),new T.MeshStandardMaterial({color:'#28383d',metalness:.45,roughness:.45}));platform.position.y=-.025;scene.add(platform);
  const ring=new T.Mesh(new T.TorusGeometry(.5,.008,6,64),new T.MeshBasicMaterial({color:'#eec489'}));ring.rotation.x=Math.PI/2;ring.position.y=.008;scene.add(ring);
  const downQ=new T.Quaternion(),tQ=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),Math.PI/2),u=new T.Quaternion(),f=new T.Quaternion();
+ let stage,screen,layoutDirty=true;const invalidateLayout=()=>{layoutDirty=true;};
+ const observer=new ResizeObserver(invalidateLayout);observer.observe(anchor);observer.observe(renderer.domElement);
+ window.addEventListener('resize',invalidateLayout,{passive:true});window.addEventListener('scroll',invalidateLayout,{passive:true,capture:true});
  return {render(now,tracking){
-  const stage=anchor.getBoundingClientRect(),screen=renderer.domElement.getBoundingClientRect();if(!stage.width||!stage.height)return;
+  if(layoutDirty){stage=anchor.getBoundingClientRect();screen=renderer.domElement.getBoundingClientRect();layoutDirty=false;}if(!stage.width||!stage.height)return;
   const fresh=tracking.connected&&tracking.last&&now-tracking.last<500,live=fresh&&(tracking.flags&1)&&!(tracking.flags&6)&&!tracking.calPending;
   const reference=(tracking.flags&16)?tQ:downQ;
   if(live||tracking.demo){u.copy(tracking.qu);f.copy(tracking.qf);}else if(!tracking.connected||!(tracking.flags&1)){u.slerp(reference,.13);f.slerp(reference,.13);}

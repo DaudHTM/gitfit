@@ -37,9 +37,24 @@ The active goal is to improve UI, functionality, latency, sound, animation, dyna
 - Browser Spell Rush: verified all three keyboard shortcuts, multi-stage wards, overdrive, pause/resume and a complete 45-second round. Result: 8,475 points, 18 defeated wards, 100% matched casts, best chain 34. Practice added no calories. Rendering read 60 FPS / 18 ms frame intervals during play; no console errors.
 - Physical IMU motion and end-to-end latency have not been measured. No firmware change or hardware flashing occurred in this pass.
 
+## Results, challenges and rendering pass
+
+- Added compact per-game round challenges, completion chimes, a redesigned score/results panel with three meaningful stats, and a Next game button that starts the next mode directly. Live results show estimated calories for the round and session; practice remains explicitly labeled and uncounted.
+- Separated new personal records by game, live/practice input and Quick/Standard duration. Existing mixed records remain untouched in their old storage key. Abandoned rounds no longer save a personal best. Invalid/unavailable storage is tolerated.
+- Reused Target Rush ring geometry and saber outline geometry/materials instead of allocating them repeatedly. Batched immutable street, boxing, castle, saber and target-room scenery, preserving animated exclusions and transparent objects. The lobby avatar reuses layout measurements until resize/scroll/layout changes. Settings now includes total scene draw and geometry counts.
+- Fixed the zombie jaw losing its initial vertical offset during animation and provided an explicit fullscreen accessible name at narrow widths.
+
+### Verification
+
+- 68 tests and 22 JavaScript syntax checks passed. Static-batch tests compare every instance against the original nested world transforms and verify exclusions; record tests verify input/duration separation and reload behavior.
+- Browser Target Rush: 25 hits / 25 bullseyes scored 4,346; the 12-target challenge completed, the round finished, and results showed the correct 45-second time and practice status. Geometry count stayed at 26 from 12 through 25 hits; rendering read 60 FPS / 18 ms frame intervals. Draw counts ranged 53–58 with active effects.
+- Browser: result panel fits desktop and 390×844 layouts without horizontal overflow. Next game started Zombie Boxing with a fresh score, full health and 45 seconds, keeping practice input.
+- Browser: after reload, Target Rush Practice/Quick best was 4,346; Live/Quick and Practice/Standard remained zero. Restored Quick and live input after testing. Batched castle/lobby visuals inspected; no console errors.
+- This is local rendering evidence, not a controlled before/after hardware latency benchmark. No physical IMU session or firmware changes in this pass.
+
 ## Continuing work
 
-- Further improve short-round results, game-specific challenges and readability; preserve the minimal lobby.
+- Further tune first-time game cues and character/impact animations without adding lobby clutter.
 - Profile sustained play and allocation/resource behavior across every game; validate physical end-to-end latency and wearable parry feel when hardware input is available.
 
 The working app is served locally. The previously inaccessible hosted Site has not been replaced.

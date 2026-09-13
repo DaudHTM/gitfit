@@ -39,3 +39,17 @@
 @media(prefers-reduced-motion:reduce){#impactVignette{display:none}}
 
 #practiceGuard[aria-pressed="true"]{background:#a9dfc5;color:#142a28;border-color:#a9dfc5}#opponentHud[data-opening="true"]{color:#bfffe3}#hitFeedback[data-kind="parry"]{color:#ddfbff;text-shadow:0 0 25px #a4e8ff66}#hitFeedback[data-kind="riposte"]{color:#baffdf;font-size:clamp(28px,3.4vw,44px)}
+
+/* Round feedback remains inside the game; the lobby stays minimal. */
+#roundChallenge{position:absolute;left:30px;top:106px;z-index:2;font-size:11px;color:#c2cecc;letter-spacing:.15px;pointer-events:none}
+#roundChallenge[data-complete="true"],#resultChallenge[data-complete="true"]{color:#a9e5c6}
+.game-shell .overlay-card:has(#roundResults:not([hidden])){width:min(490px,100%);max-width:490px}
+.game-shell .overlay-card:has(#roundResults:not([hidden])) h2{font-size:32px;letter-spacing:-1px;margin:0 0 8px}
+#roundResults #resultMode{font-size:11px;color:#a8bcbf;margin:0 0 13px;letter-spacing:.5px}
+.result-score{display:flex;flex-direction:column;gap:4px}.result-score strong{font-size:clamp(58px,8vw,86px);font-weight:500;line-height:1.05;letter-spacing:-3px;color:#f3d2a4}.result-score span{font-size:9px;letter-spacing:2px;color:#dfcbb0}
+.result-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0 17px;padding:17px 0;border-top:1px solid #9faeac30;border-bottom:1px solid #9faeac30}.result-metrics dt{font-size:10px;color:#a2b6b7}.result-metrics dd{margin:7px 0 0;font:400 23px 'Space Grotesk',sans-serif;color:#edf0e9}
+#roundResults #resultChallenge{font-size:12px;margin:0 0 7px}#roundResults #resultFitness{font-size:10px;color:#9eafaf;margin:0 0 18px}
+.game-shell #nextRound{background:#1e323bcc;color:#dde7e3;border-color:#82978d6b;margin-left:8px;font-size:12px;padding:15px 13px;min-width:180px;border-radius:3px}
+.game-shell .overlay-card:has(#roundResults:not([hidden])) #startGame{border-radius:3px}
+@media(max-width:780px){#roundChallenge{left:15px;top:81px;font-size:10px}.game-shell #nextRound{display:block;width:100%;margin:9px 0 0}.game-shell .overlay-card:has(#roundResults:not([hidden])) #startGame{width:100%}.game-shell .overlay-card:has(#roundResults:not([hidden])) h2{font-size:28px}.result-metrics{gap:8px;margin:17px 0 14px;padding:14px 0}.result-metrics dd{font-size:21px}}
+@media(max-height:600px){.game-shell .overlay-card:has(#roundResults:not([hidden])) h2{font-size:25px}.result-score strong{font-size:52px}.result-metrics{margin:12px 0;padding:10px 0}#roundResults #resultFitness{margin-bottom:8px}}

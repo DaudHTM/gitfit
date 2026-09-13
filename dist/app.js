@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {FrameBudget,writeText} from './frame-budget.js';
-import {createArcade} from './game.js?v=spell-pass3';
+import {createArcade} from './game.js?v=results-pass2';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap,calibrationView} from './protocol.js';
 const $=id=>document.getElementById(id);
 const frameBudget=new FrameBudget(devicePixelRatio);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(frameBudget.ratio);renderer.setClearColor('#162023');$('viewport').prepend(renderer.domElement);
+renderer.info.autoReset=false;
 let upperLen=.3,lowerLen=.26;function dimensions(){upperLen=Math.min(50,Math.max(15,Number($('upperLength').value)||30))/100;lowerLen=Math.min(45,Math.max(15,Number($('lowerLength').value)||26))/100;}dimensions();$('upperLength').onchange=dimensions;$('lowerLength').onchange=dimensions;
 const qu=new THREE.Quaternion(),qf=new THREE.Quaternion(),basis=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2),basisInv=basis.clone().invert();
 const trackingSamples=[];let motionSequence=null,motionClock=0,motionArrival=0;
@@ -48,8 +49,8 @@ const arcade=createArcade(renderer,()=>({qu,qf,upperLen,lowerLen,last,flags:late
 const down=new THREE.Vector3(0,-1,0),u=new THREE.Vector3(),f=new THREE.Vector3();let uiTime=0;
 try{const saved=localStorage.getItem('armature-graphics');if(['auto','low','high'].includes(saved)){$('graphicsQuality').value=saved;renderer.setPixelRatio(frameBudget.setMode(saved));}}catch{}
 $('graphicsQuality').onchange=()=>{renderer.setPixelRatio(frameBudget.setMode($('graphicsQuality').value));try{localStorage.setItem('armature-graphics',$('graphicsQuality').value);}catch{}};
-renderer.setAnimationLoop(now=>{const renderStart=performance.now();if(demo&&!arcade.active){qu.setFromEuler(new THREE.Euler(.15*Math.sin(now/1300),0,.32+.25*Math.sin(now/1900)));qf.copy(qu).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.85-.8*Math.sin(now/1100)))}
+renderer.setAnimationLoop(now=>{renderer.info.reset();const renderStart=performance.now();if(demo&&!arcade.active){qu.setFromEuler(new THREE.Euler(.15*Math.sin(now/1300),0,.32+.25*Math.sin(now/1900)));qf.copy(qu).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-.85-.8*Math.sin(now/1100)))}
  u.copy(down).applyQuaternion(qu);f.copy(down).applyQuaternion(qf);
  if(now-uiTime>100){uiTime=now;if(packetUI){const p=packetUI;renderCalibration(p.flags,p.progress,p.calibrationReason);writeText($('mode'),p.flags&4?'SENSOR ERROR':p.flags&2?'CALIBRATING':p.flags&1?'LIVE':p.flags&16?'T-POSE NEXT':'NEEDS CALIBRATION');writeText($('upperState'),p.flags&4?'Check wiring':'Streaming');writeText($('lowerState'),p.flags&4?'Check wiring':'Streaming');}$('angle').innerHTML=`${Math.round(THREE.MathUtils.radToDeg(u.angleTo(f)))}<small>°</small>`;if(last){$('age').innerHTML=`${Math.round(now-last)}<small> ms</small>`;$('lost').textContent=lost;if(now-last>500){calibrationKey='';$('mode').textContent='STALE';$('calibrate').disabled=true;$('upperState').textContent=$('lowerState').textContent='No fresh data';}}if(now-rateStart>=1000){$('rate').innerHTML=last?`${Math.round(count*1000/(now-rateStart))}<small> Hz</small>`:'—';count=0;rateStart=now}if(calPending&&now>calDeadline){calPending=false;renderCalibration(latestFlags);$('calStatus').textContent='No calibration acknowledgement. Try again.'}}
- arcade.tick(now);const report=frameBudget.sample(now,performance.now()-renderStart,!document.hidden);if(report){if(report.changed)renderer.setPixelRatio(report.ratio);writeText($('frameStats'),`${report.fps} FPS · ${report.p90.toFixed(0)} ms frame`);}
+ arcade.tick(now);const report=frameBudget.sample(now,performance.now()-renderStart,!document.hidden);if(report){if(report.changed)renderer.setPixelRatio(report.ratio);writeText($('frameStats'),`${report.fps} FPS · ${report.p90.toFixed(0)} ms frame`);writeText($('sceneStats'),`${renderer.info.render.calls} draws · ${renderer.info.memory.geometries} geometries`);}
 });

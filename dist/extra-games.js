@@ -1,9 +1,9 @@
 import * as T from 'three';
 import {createSword,createBird} from './equipment.js';
-import {sweptHit} from './game-logic.js?v=spell-pass3';
-import {FlapTracker,FLIGHT,gripQuaternion,SABER_CUE_START_Z} from './motion.js?v=spell-pass3';
+import {sweptHit} from './game-logic.js?v=results-pass2';
+import {FlapTracker,FLIGHT,gripQuaternion,SABER_CUE_START_Z} from './motion.js?v=results-pass2';
 import {SwordDuel,bladesMeet,BladeHistory} from './duel-logic.js';
-import {FlightCourse} from './flight-logic.js?v=spell-pass3';
+import {FlightCourse} from './flight-logic.js?v=results-pass2';
 export const GAMES={
  zombies:{name:'Zombie Boxing',title:'DEAD / AHEAD',tag:'POWER BOXING',intro:'Make every punch count.',help:'Jab forward, hook in a sideways arc, or uppercut in an upward arc. Faster wrist motion deals more damage. Recover between strikes.'},
  targets:{name:'Target Rush',title:'TARGET / RUSH',tag:'PRECISION · 45 SECONDS',intro:'Aim for the center.',help:'Strike glowing targets with jabs, hooks, or uppercuts. Center hits and quick reactions earn bonus points.'},
@@ -19,10 +19,11 @@ export function createExtraGames(scene,mesh,geo,feedback,sound){
  const group=new T.Group();scene.add(group);const objects=[],effects=[];
  const weapon=createSword(),sword=weapon.root;group.add(sword);
  const trailArray=new Float32Array(24),trailGeometry=new T.BufferGeometry();trailGeometry.setAttribute('position',new T.BufferAttribute(trailArray,3));
- const trail=new T.Line(trailGeometry,new T.LineBasicMaterial({color:'#84f1df',transparent:true,opacity:.65,depthWrite:false}));trail.frustumCulled=false;group.add(trail);let trailPoints=[];const enemySwordTemplate=createSword().root,bladeHistory=new BladeHistory();let practiceSwing=0,parries=0,finishes=0;
+ const trail=new T.Line(trailGeometry,new T.LineBasicMaterial({color:'#84f1df',transparent:true,opacity:.65,depthWrite:false}));trail.frustumCulled=false;group.add(trail);let trailPoints=[];const enemySwordTemplate=createSword().root,bladeHistory=new BladeHistory();let practiceSwing=0,parries=0,finishes=0,bestCombo=0,totalHits=0;
  const shield=mesh(geo.sphere,'#5482a5',group,[0,1.3,-.5],[.22,.22,.035]);
  const shieldRing=new T.Mesh(new T.TorusGeometry(.235,.014,6,40),new T.MeshBasicMaterial({color:'#9cecff'}));group.add(shieldRing);
  const raptor=createBird(),bird=raptor.root,body=raptor.body,wings=raptor.wings;group.add(bird);
+ const saberEdgeGeometry=new T.EdgesGeometry(geo.box),saberEdgeMaterial=new T.LineBasicMaterial({color:'#e8ffff'});
  const meteorGeometry=new T.IcosahedronGeometry(.13,1),flaps=new FlapTracker(),course=new FlightCourse(),flight=course.flight,gateMeshes=new Map();
  let mode,time,next,score,hp,combo,lastTip,lastBase,actionAt,clock,spawnIndex,prevTime,wingStroke=0,viewBehind=false,lastSwing=-10;
  const position=new T.Vector3(),keys=new Set();let pointer=null,dragging=false;
@@ -33,12 +34,12 @@ export function createExtraGames(scene,mesh,geo,feedback,sound){
  viewport.addEventListener('pointerup',()=>dragging=false);viewport.addEventListener('pointercancel',()=>{dragging=false;pointer=null;});
  function remove(o){o.root.userData.disposable?.forEach(x=>x.dispose());group.remove(o.root);const i=objects.indexOf(o);if(i>=0)objects.splice(i,1);}
  function burst(center,color,split=false){for(let i=0;i<(split?2:8);i++){const root=mesh(geo.box,color,group,center.toArray(),split?[.12,.25,.25]:[.025,.025,.025]);effects.push({root,v:new T.Vector3((i%2?1:-1)*(split?1.2:Math.random()),Math.random()+.4,(Math.random()-.5)),life:.55});}}
- function reset(m){[...objects].forEach(remove);effects.forEach(e=>group.remove(e.root));effects.length=0;mode=m;time=0;next=1;score=0;hp=5;combo=0;lastTip=lastBase=null;actionAt=-10;clock=0;spawnIndex=0;prevTime=null;position.set(0,1.3,-.5);keys.clear();pointer=null;dragging=false;flaps.reset();course.reset();for(const root of gateMeshes.values())group.remove(root);gateMeshes.clear();if(m==='bird')syncGates();trailPoints=[];wingStroke=0;lastSwing=-10;practiceSwing=0;parries=0;finishes=0;bladeHistory.reset();if(m==='sword'){spawn(-2.4);next=5.5;}
+ function reset(m){[...objects].forEach(remove);effects.forEach(e=>group.remove(e.root));effects.length=0;mode=m;time=0;next=1;score=0;hp=5;combo=0;lastTip=lastBase=null;actionAt=-10;clock=0;spawnIndex=0;prevTime=null;position.set(0,1.3,-.5);keys.clear();pointer=null;dragging=false;flaps.reset();course.reset();for(const root of gateMeshes.values())group.remove(root);gateMeshes.clear();if(m==='bird')syncGates();trailPoints=[];wingStroke=0;lastSwing=-10;practiceSwing=0;parries=0;finishes=0;bestCombo=0;totalHits=0;bladeHistory.reset();if(m==='sword'){spawn(-2.4);next=5.5;}
   group.visible=!['zombies','targets','lab'].includes(m);sword.visible=m==='sword'||m==='saber';trail.visible=sword.visible;trail.material.opacity=0;weapon.setMode(m);shield.visible=shieldRing.visible=m==='shield';bird.visible=m==='bird';
  }
  function spawn(z=-5){const root=new T.Group();group.add(root);const i=spawnIndex++,color=i%2?'#bf99ff':'#86f5e1';let arms=[];
   if(mode==='shield'){root.position.set([-.35,.2,.4,-.1][i%4],[1.1,1.5,1.2,1.65][i%4],-6);mesh(meteorGeometry,'#d48963',root,[0,0,0],[1,1,1]);mesh(geo.sphere,'#ffcf7d',root,[0,0,-.12],[.07,.07,.18]);}
-  else if(mode==='saber'){root.position.set(.2+(i%3-1)*.07,1.4+(i%2)*.07,-5);mesh(geo.box,color,root,[0,0,0],[.25,.25,.25]);const edge=new T.LineSegments(new T.EdgesGeometry(geo.box),new T.LineBasicMaterial({color:'#e8ffff'}));edge.scale.setScalar(.257);root.add(edge);root.userData.disposable=[edge.geometry,edge.material];mesh(geo.box,'#ffffff',root,[0,0,.13],[.13,.026,.008]);}
+  else if(mode==='saber'){root.position.set(.2+(i%3-1)*.07,1.4+(i%2)*.07,-5);mesh(geo.box,color,root,[0,0,0],[.25,.25,.25]);const edge=new T.LineSegments(saberEdgeGeometry,saberEdgeMaterial);edge.scale.setScalar(.257);root.add(edge);mesh(geo.box,'#ffffff',root,[0,0,.13],[.13,.026,.008]);}
   else{root.position.set(.15,0,z);mesh(geo.sphere,'#91abc6',root,[0,1.48,0],[.15,.18,.15]);mesh(geo.sphere,'#526d87',root,[0,1.07,0],[.25,.29,.16]);mesh(geo.box,'#b4c9d7',root,[0,1.18,.16],[.16,.19,.025]);
    for(const s of [-1,1]){mesh(geo.sphere,'#344b66',root,[s*.12,.44,0],[.095,.4,.1]);mesh(geo.sphere,'#b6cedb',root,[s*.23,1.29,0],[.095,.09,.1]);const arm=new T.Group();root.add(arm);arm.position.set(s*.25,1.24,0);mesh(geo.box,'#718b9d',arm,[0,-.16,.04],[.095,.34,.12]);arms.push(arm);mesh(geo.sphere,'#3d5569',root,[s*.12,.1,.05],[.1,.07,.14]);}
    mesh(geo.box,'#a5f3ec',root,[0,1.49,.14],[.21,.035,.025]);
@@ -116,7 +117,7 @@ export function createExtraGames(scene,mesh,geo,feedback,sound){
       const parried=engaged&&o.duel.canParry&&bladesMeet(path.current,enemyBlade,path.previous,o.blade||enemyBlade)&&o.duel.parry(strokeId);
       if(parried){parries++;if(o.duel.parries===1)score+=25;o.recoil=1;feedback(o.duel.parries===1?'PARRY +25 · COUNTER NOW':'PARRY · COUNTER NOW',{kind:'parry',point:base.clone().lerp(tip,.5),power:1.2});}
       const contact=sweptHit(path.previous.tip,path.current.tip,centerArray,.34)||sweptHit(path.current.base,path.current.tip,centerArray,.32);
-      if(engaged&&o.duel.counter(strokeId,path.speed,contact)){const points=o.duel.style.points+combo*25;score+=points;combo++;finishes++;o.dead=.001;feedback(`RIPOSTE +${points}`,{kind:'riposte',point:center,power:1.35,direction:new T.Vector3(...path.current.tip).sub(new T.Vector3(...path.previous.tip)).normalize()});break;}
+      if(engaged&&o.duel.counter(strokeId,path.speed,contact)){const points=o.duel.style.points+combo*25;score+=points;combo++;bestCombo=Math.max(bestCombo,combo);finishes++;o.dead=.001;feedback(`RIPOSTE +${points}`,{kind:'riposte',point:center,power:1.35,direction:new T.Vector3(...path.current.tip).sub(new T.Vector3(...path.previous.tip)).normalize()});break;}
       else if(!parried&&engaged&&contact&&path.speed>.8&&o.duel.phase!=='open'&&clock-o.hitAt>.6){o.hitAt=clock;feedback('PARRY FIRST',{kind:'armor',point:center,power:.45});}
      }
      o.blade=enemyBlade;
@@ -127,14 +128,14 @@ export function createExtraGames(scene,mesh,geo,feedback,sound){
     hit=inTime&&clock-o.hitAt>.6&&paths.some(path=>path.speed>.55&&(sweptHit(path.previous.tip,path.current.tip,center.toArray(),.23)||sweptHit(path.current.base,path.current.tip,center.toArray(),.19)||sweptHit(path.previous.base,path.current.base,center.toArray(),.2)));
     miss=mode==='saber'&&o.root.position.z>.02;
    }
-   if(hit){const points=100+combo*10;score+=points;combo++;burst(o.root.position.clone().add(new T.Vector3(0,mode==='sword'?1.3:0,0)),o.color||'#ffdb9e',mode==='saber');const point=o.root.position.clone().add(new T.Vector3(0,mode==='sword'?1.3:0,0));if(mode==='sword')o.dead=.001;else remove(o);feedback(`${mode==='shield'?'BLOCK':mode==='sword'?'DEFEATED':'SLICE'} +${points} · ${combo}×`,{kind:mode==='shield'?'block':'slash',point,power:mode==='shield'?1:Math.min(1.5,speed/3),direction:lastTip?tip.clone().sub(lastTip).normalize():null});}
+   if(hit){const points=100+combo*10;score+=points;combo++;totalHits++;bestCombo=Math.max(bestCombo,combo);burst(o.root.position.clone().add(new T.Vector3(0,mode==='sword'?1.3:0,0)),o.color||'#ffdb9e',mode==='saber');const point=o.root.position.clone().add(new T.Vector3(0,mode==='sword'?1.3:0,0));if(mode==='sword')o.dead=.001;else remove(o);feedback(`${mode==='shield'?'BLOCK':mode==='sword'?'DEFEATED':'SLICE'} +${points} · ${combo}×`,{kind:mode==='shield'?'block':'slash',point,power:mode==='shield'?1:Math.min(1.5,speed/3),direction:lastTip?tip.clone().sub(lastTip).normalize():null});}
    else if(miss){combo=0;hp--;remove(o);feedback('MISSED −1',{kind:'hurt',point:new T.Vector3(0,1.4,-.3),power:.55});}
   }
   for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.v.y-=dt*2;e.root.position.addScaledVector(e.v,dt);e.root.rotation.z+=dt*3;if(e.life<=0){group.remove(e.root);effects.splice(i,1);}}
   lastTip=tip;lastBase=base;prevTime=time;
   const opponent=duelOrder.find(o=>!o.dead),duel=opponent?.duel;
   const cue=duel?(duel.phase==='open'?'COUNTER NOW':duel.canParry?'PARRY NOW':duel.phase==='windup'?'Incoming blade':duel.phase==='approach'?'Approaching':'Cross swords to parry'):'';
-  return {score,hp,combo,parries,finishes,opponent:duel?{name:duel.style.name,cue,opening:duel.phase==='open',fraction:duel.phase==='open'?1-duel.time/duel.style.opening:duel.phase==='windup'?duel.time/duel.style.windup:1}:null,seconds:Math.max(0,Math.ceil(60-time)),over:hp<=0||(mode!=='sword'&&time>=60),detail:mode==='saber'?(objects.some(o=>o.root.position.z>SABER_CUE_START_Z&&o.root.position.z<-.3)?'CUT NOW':'120 BPM · cut every 2 beats'):mode==='sword'?'Parry → new slash · one-hit finish':`${combo} consecutive blocks`};
+  return {score,hp,combo,parries,finishes,bestCombo,totalHits,opponent:duel?{name:duel.style.name,cue,opening:duel.phase==='open',fraction:duel.phase==='open'?1-duel.time/duel.style.opening:duel.phase==='windup'?duel.time/duel.style.windup:1}:null,seconds:Math.max(0,Math.ceil(60-time)),over:hp<=0||(mode!=='sword'&&time>=60),detail:mode==='saber'?(objects.some(o=>o.root.position.z>SABER_CUE_START_Z&&o.root.position.z<-.3)?'CUT NOW':'120 BPM · cut every 2 beats'):mode==='sword'?'Parry → new slash · one-hit finish':`${combo} consecutive blocks`};
  }
  function preview(now){if(mode!=='bird')return;group.visible=true;bird.position.set(.3,2.3,-3);body.visible=true;bird.rotation.z=Math.sin(now*.0005)*.08;wings.forEach((w,i)=>w.rotation.z=(i?1:-1)*(.12+Math.sin(now*.002)*.22));}
  reset('zombies');return {reset,tick,pose,group,preview,setView(behind){viewBehind=behind;body.visible=behind;},suspend(){lastTip=lastBase=null;keys.clear();pointer=null;dragging=false;actionAt=-10;flaps.reset();bladeHistory.reset(true);}};

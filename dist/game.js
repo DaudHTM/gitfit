@@ -1,15 +1,17 @@
 import * as T from 'three';
-import {sweptHit,strike,nextOpponent,punchExtension,punchHitsBody,BOXING_STOP_Z,zombieProfile} from './game-logic.js?v=spell-pass3';
+import {sweptHit,strike,nextOpponent,punchExtension,punchHitsBody,BOXING_STOP_Z,zombieProfile} from './game-logic.js?v=results-pass2';
 import {ActivityTracker} from './activity.js';
-import {createSound} from './sound.js?v=spell-pass3';
-import {createImpactEffects} from './impact-effects.js?v=spell-pass3';
-import {GAMES,createExtraGames} from './extra-games.js?v=spell-pass3';
-import {TrajectoryPunchTracker,practiceStroke,saberPracticeRoll} from './motion.js?v=spell-pass3';
+import {createSound} from './sound.js?v=results-pass2';
+import {createImpactEffects} from './impact-effects.js?v=results-pass2';
+import {GAMES,createExtraGames} from './extra-games.js?v=results-pass2';
+import {TrajectoryPunchTracker,practiceStroke,saberPracticeRoll} from './motion.js?v=results-pass2';
 import {setupFullscreen} from './fullscreen.js';
 import {createWorldDetails} from './world-details.js';
-import {createAvatar,createLobbyAvatar} from './avatar.js?v=spell-pass3';
-import {createBoxingModels} from './boxing-models.js?v=spell-pass3';
+import {createAvatar,createLobbyAvatar} from './avatar.js?v=results-pass2';
+import {createBoxingModels} from './boxing-models.js?v=results-pass2';
 import {createSpellGame} from './spell-game.js';
+import {batchStaticMeshes} from './scene-batch.js';
+import {RoundRecords,roundChallenge,resultMetrics} from './round-results.js';
 const nodes=new Map();const $=id=>nodes.get(id)||(nodes.set(id,document.getElementById(id)),nodes.get(id));
 const GAME_ORDER=['zombies','bird','saber','sword','spell','shield','targets'];
 export function createArcade(renderer,getTracking){
@@ -18,6 +20,7 @@ export function createArcade(renderer,getTracking){
  const camera=new T.PerspectiveCamera(66,1,.03,50);camera.position.set(.34,2.06,.80);camera.lookAt(.10,1.22,-2.3);
  scene.add(new T.HemisphereLight(0xafd5ef,0x263040,2.1));const moon=new T.DirectionalLight(0xb7d8ff,2.7);moon.position.set(3,7,2);scene.add(moon);
  const materials={};function material(c){return materials[c]??=new T.MeshStandardMaterial({color:c,roughness:.75})}
+ const targetRingGeometry=new T.TorusGeometry(.195,.012,6,32);
  const boxGeo=new T.BoxGeometry(1,1,1),sphereGeo=new T.SphereGeometry(1,14,10),cylinderGeo=new T.CylinderGeometry(1,1,1,12);
  function mesh(geo,color,parent,position,scale){const m=new T.Mesh(geo,material(color));m.position.set(...position);m.scale.set(...scale);parent.add(m);return m}
  const street=new T.Group();scene.add(street);
@@ -34,6 +37,7 @@ export function createArcade(renderer,getTracking){
  for(const side of [-1,1]){for(let i=0;i<8;i++){mesh(boxGeo,'#546481',arena,[side*1.5,1.5,-i*2.2],[.08,3,.08]);mesh(boxGeo,'#86e8db',arena,[side*1.5,2.95,-i*2.2],[.1,.035,.1]);}mesh(boxGeo,'#8deedf',arena,[side*.55,.01,-6],[.025,.02,14]);}
  const strikeZone=new T.Mesh(new T.TorusGeometry(.45,.014,6,40),material('#b595ff'));strikeZone.position.set(.2,1.35,-.6);arena.add(strikeZone);
  const boxing=createBoxingModels(scene),world=createWorldDetails(scene);
+ batchStaticMeshes(T,street);batchStaticMeshes(T,arena,{exclude:[strikeZone]});
  const rig=createAvatar(),player=rig.root;scene.add(player);const bodyParts=[rig.body];
  const lobbyAvatar=createLobbyAvatar(renderer,$('avatarStage'));
  const rightShoulder=new T.Vector3(.23,1.35,0),leftShoulder=new T.Vector3(-.23,1.35,0);
@@ -48,10 +52,10 @@ export function createArcade(renderer,getTracking){
  rig.rightHand.visible=rig.leftHand.visible=false;
  const leftElbow=new T.Vector3(-.29,1.10,-.15);bone(leftUpper,leftShoulder,leftElbow);bone(leftLower,leftElbow,leftGlove.position);
  const elbow=new T.Vector3(),fist=new T.Vector3(),down=new T.Vector3(0,-1,0),practiceUpper=new T.Quaternion(),practiceLower=new T.Quaternion();
- const enemies=[];let targetScore=0;let target=null,elapsed=0,nextSpawn=0,kills=0,hits=0,boxingScore=0,spawned=0,lives=5,wave=1,active=false,mode='zombies',state='menu',input='live',lastFrame=0,practiceStart=-10000,practiceClock=0,feedbackUntil=0,hudAt=0,practiceGuard=false,roundLimit=45,practiceStyle='jab',practiceEffort=2;
+ const enemies=[];let targetScore=0;let target=null,elapsed=0,nextSpawn=0,kills=0,hits=0,boxingScore=0,spawned=0,lives=5,wave=1,active=false,mode='zombies',state='menu',input='live',lastFrame=0,practiceStart=-10000,practiceClock=0,feedbackUntil=0,hudAt=0,practiceGuard=false,roundLimit=45,practiceStyle='jab',practiceEffort=2,bestCombo=0,bullseyes=0,challengeDone=false,roundStartKcal=0;
  const detector=new TrajectoryPunchTracker(),sound=createSound(),activity=new ActivityTracker(),impactFx=createImpactEffects(scene);
- const extra=createExtraGames(scene,mesh,{box:boxGeo,sphere:sphereGeo},feedback,sound);let extraResult=null,action=false,shake=0,best={},focus=null,lastWhoosh=-1000,combo=0,lastHit=-1000;const cameraAim=new T.Vector3(.1,1.3,-2.3);
- const spells=createSpellGame(scene,feedback,sound);
+ const extra=createExtraGames(scene,mesh,{box:boxGeo,sphere:sphereGeo},feedback,sound);let extraResult=null,action=false,shake=0,focus=null,lastWhoosh=-1000,combo=0,lastHit=-1000;const cameraAim=new T.Vector3(.1,1.3,-2.3);
+ const spells=createSpellGame(scene,feedback,sound);let storage;try{storage=localStorage;}catch{}const records=new RoundRecords(storage);
  $('openSetup').onclick=()=>{pause('Device setup is open. Resume when you are ready.');$('setupDialog').showModal();};$('closeSetup').onclick=()=>$('setupDialog').close();
  try{const saved=localStorage.getItem('armature-round');if(['0','45'].includes(saved))$('roundDuration').value=saved;}catch{}
  $('roundDuration').onchange=()=>{try{localStorage.setItem('armature-round',$('roundDuration').value);}catch{}};
@@ -61,7 +65,7 @@ export function createArcade(renderer,getTracking){
  audioSettings();$('musicVolume').oninput=$('effectsVolume').oninput=()=>{sound.unlock();audioSettings();};$('impactEffects').onchange=()=>impactFx.setEnabled($('impactEffects').checked);
  function workoutUI(){const goal=Number($('workoutGoal').value)*60;$('workoutProgress').max=goal;$('workoutProgress').value=activity.seconds;const calories=Number($('calorieGoal').value);$('calorieProgress').max=calories;$('calorieProgress').value=activity.kcal;$('workoutStatus').textContent=activity.seconds>=goal&&activity.kcal>=calories?'Targets reached':''; $('workoutProgress').closest('.goal-lines').hidden=activity.seconds===0;$('calories').textContent=activity.kcal.toFixed(1);$('activeTime').textContent=(activity.seconds/60).toFixed(1)+' min';}
  $('workoutGoal').onchange=$('calorieGoal').onchange=workoutUI;
- try{best=JSON.parse(localStorage.getItem('armature-bests')||'{}');$('weight').value=localStorage.getItem('armature-weight')||70;}catch{}
+ try{$('weight').value=localStorage.getItem('armature-weight')||70;}catch{}
  $('weight').onchange=()=>{try{localStorage.setItem('armature-weight',$('weight').value)}catch{}};
  $('resetActivity').onclick=()=>{activity.reset();workoutUI();};$('soundToggle').onclick=$('gameSound').onclick=()=>{const text=sound.toggle()?'Sound off':'Sound on';$('soundToggle').textContent=$('gameSound').textContent=text;};
  const fullscreen=setupFullscreen($('viewport'),$('fullscreen'),pause);$('immersivePause').onclick=()=>state==='playing'?pause():state==='paused'?start():null;$('immersiveAction').onclick=()=>practicePunch();
@@ -69,17 +73,31 @@ export function createArcade(renderer,getTracking){
  function zombie(z){const index=spawned++,profile=zombieProfile(index,wave),e=boxing.fighter(index,profile);Object.assign(e,{kind:profile.name,speedMultiplier:profile.speed,attackPeriod:profile.attackPeriod,points:profile.points});e.root.position.set(.16,0,z);e.hp=e.maxHp=profile.hp;enemies.push(e);return e;}
  function removeObject(root){scene.remove(root)}
  function clear(){impactFx.clear();const buffered=getTracking().samples;if(buffered)buffered.length=0;$('hitFeedback').textContent='';$('strikeReadout').textContent='Wrist speed · estimated';$('hitFeedback').classList.remove('show');$('gameDetail').textContent='';focus=null;combo=0;for(const e of enemies)removeObject(e.root);enemies.length=0;if(target){removeObject(target.root);target=null}detector.reset();}
- function practiceTarget(){if(target)removeObject(target.root);const root=new T.Group();scene.add(root);const x=input==='practice'?.20:[.18,.02,.28][hits%3],y=input==='practice'?1.30:[1.30,1.12,1.43][hits%3];root.position.set(x,y,-.53);mesh(sphereGeo,'#d8ff87',root,[0,0,0],[.16,.16,.06]);mesh(sphereGeo,'#33462d',root,[0,0,.05],[.105,.105,.02]);mesh(sphereGeo,'#d8ff87',root,[0,0,.075],[.04,.04,.02]);const ring=new T.Mesh(new T.TorusGeometry(.195,.012,6,32),material('#ffca90'));root.add(ring);target={root,ring,born:elapsed};}
+ function practiceTarget(){if(target)removeObject(target.root);const root=new T.Group();scene.add(root);const x=input==='practice'?.20:[.18,.02,.28][hits%3],y=input==='practice'?1.30:[1.30,1.12,1.43][hits%3];root.position.set(x,y,-.53);mesh(sphereGeo,'#d8ff87',root,[0,0,0],[.16,.16,.06]);mesh(sphereGeo,'#33462d',root,[0,0,.05],[.105,.105,.02]);mesh(sphereGeo,'#d8ff87',root,[0,0,.075],[.04,.04,.02]);const ring=new T.Mesh(targetRingGeometry,material('#ffca90'));root.add(ring);target={root,ring,born:elapsed};}
  function feedback(text,{kind='punch',point=fist,power=1,direction=null}={}){power=T.MathUtils.clamp(power,.3,1.5);shake=Math.max(shake,kind==='miss'?0:mode==='bird'?.009:.022+power*.024);sound.play(kind,{power,pan:T.MathUtils.clamp(point.x*.65,-.7,.7)});if(kind!=='miss')impactFx.burst(point,kind,power,direction);$('hitFeedback').textContent=text;$('hitFeedback').dataset.kind=kind;feedbackUntil=performance.now()+(kind==='knockout'?950:650);$('hitFeedback').classList.add('show');if($('impactEffects').checked&&!reducedMotion.matches)$('hitFeedback').animate([{transform:`translateY(5px) scale(${1.03+power*.04})`},{transform:'translateY(0) scale(1)'}],{duration:220,easing:'ease-out'});}
- function overlay(title,text,button){$('gameOverlay').hidden=false;$('overlayTitle').textContent=title;$('overlayText').textContent=text;$('startGame').textContent=button;}
+ function overlay(title,text,button){$('roundResults').hidden=true;$('nextRound').hidden=true;$('overlayTip').hidden=false;$('gameOverlay').hidden=false;$('overlayTitle').textContent=title;$('overlayText').textContent=text;$('startGame').textContent=button;}
  function liveReady(){const t=getTracking();return t.connected&&t.last&&performance.now()-t.last<250&&(t.flags&1)&&!(t.flags&6)&&!t.calPending;}
  function ready(){return input==='practice'||liveReady()}
  function pause(reason=''){if(state!=='playing')return;state='paused';hudAt=0;sound.stop();extra.suspend();action=false;detector.reset();overlay('Paused',reason,'Resume round');$('pauseGame').textContent='Resume';}
- function finish(quiet=false,timed=false){sound.stop();if(!quiet)sound.play((mode==='zombies'?lives<=0:extraResult?.hp<=0)?'defeat':'finish');const score=extraResult?.score??(mode==='zombies'?boxingScore:targetScore);best[mode]=Math.max(best[mode]||0,score);try{localStorage.setItem('armature-bests',JSON.stringify(best))}catch{}state='over';hudAt=0;$('opponentHud').hidden=true;detector.reset();overlay(timed?'Round complete.':mode==='bird'?'Flight over.':mode==='zombies'?'Run complete.':(extraResult?.hp<=0?'Run complete.':'Time’s up.'),mode==='zombies'?`${kills} zombies defeated · ${hits} hits landed · wave ${wave}`:`${hits} targets hit in 45 seconds.`, 'Play again');$('overlayText').textContent=`Score ${score} · Best ${best[mode]} · ${mode==='sword'?`${extraResult?.parries||0} parries · ${extraResult?.finishes||0} finishes`:mode==='spell'?`${extraResult?.defeated||0} shattered · ${extraResult?.accuracy||0}% matched · ${extraResult?.bestCombo||0} best chain`:extraResult?extraResult.combo+(mode==='bird'?' gaps':' combo'):hits+' hits'}. Session: ${activity.kcal.toFixed(1)} estimated kcal.`;$('pauseGame').disabled=true;}
+ function roundStats(){return {...(extraResult||{}),kills,hits,bullseyes,elapsed,bestCombo:extraResult?.bestCombo??bestCombo};}
+ function finish(quiet=false,timed=false){
+  sound.stop();state='over';hudAt=0;$('opponentHud').hidden=true;detector.reset();$('pauseGame').disabled=true;if(quiet)return;
+  const defeated=mode==='zombies'?lives<=0:extraResult?.hp<=0;sound.play(defeated?'defeat':'finish');
+  const score=extraResult?.score??(mode==='zombies'?boxingScore:targetScore),record=records.save(mode,input,roundLimit,score),stats=roundStats(),challenge=roundChallenge(mode,stats);
+  overlay(timed?'Round complete':mode==='bird'?'Flight over':defeated?'Run complete':'Time’s up','', 'Play again');
+  $('roundResults').hidden=false;$('overlayTip').hidden=true;$('nextRound').hidden=false;
+  $('resultMode').textContent=`${GAMES[mode].name} · ${input==='practice'?'Practice':'Live arm'} · ${roundLimit?'Quick':'Standard'}`;
+  $('resultScore').textContent=score.toLocaleString();$('resultRecord').textContent=record.isNew?'NEW PERSONAL BEST':`BEST ${record.best.toLocaleString()}`;
+  resultMetrics(mode,stats).forEach(([label,value],i)=>{$(`resultLabel${i}`).textContent=label;$(`resultValue${i}`).textContent=value;});
+  $('resultChallenge').textContent=`${challenge.complete?'✓':'○'} ${challenge.label} · ${challenge.current}/${challenge.goal}`;$('resultChallenge').dataset.complete=String(challenge.complete);
+  $('resultFitness').textContent=input==='practice'?'Practice · calories paused':`${Math.max(0,activity.kcal-roundStartKcal).toFixed(1)} kcal est. this round · ${activity.kcal.toFixed(1)} this session`;
+  $('nextRound').textContent=`Next · ${GAMES[GAME_ORDER[(GAME_ORDER.indexOf(mode)+1)%GAME_ORDER.length]].name}`;
+ }
  function start(){sound.unlock();if(!ready()){if(active){$('overlayText').textContent='Tracking is not ready. Return to the lobby to reconnect or calibrate.';return;}$('lobbyNotice').textContent=getTracking().connected?'Calibrate your arm before playing.':'Connect your arm, or choose Practice in Settings.';return;}active=true;document.body.classList.add('in-game','arcade-active');$('viewport').scrollTop=0;$('settings').open=false;$('gameHud').hidden=false;$('gameToolbar').hidden=false;fullscreen.enter();
- if(state!=='paused'){roundLimit=Number($('roundDuration').value);clear();elapsed=0;nextSpawn=2.5;kills=hits=targetScore=boxingScore=spawned=0;lives=5;wave=1;extra.reset(mode);spells.reset();extraResult=null;if(mode==='zombies')zombie(-2.1);else if(mode==='targets')practiceTarget();}
+ if(state!=='paused'){roundLimit=Number($('roundDuration').value);bestCombo=bullseyes=0;challengeDone=false;roundStartKcal=activity.kcal;clear();elapsed=0;nextSpawn=2.5;kills=hits=targetScore=boxingScore=spawned=0;lives=5;wave=1;extra.reset(mode);spells.reset();extraResult=null;if(mode==='zombies')zombie(-2.1);else if(mode==='targets')practiceTarget();}
  detector.reset();practiceStart=-10000;extra.group.visible=!['zombies','targets','spell'].includes(mode);state='playing';hudAt=0;sound.setScene(mode,true,elapsed);$('viewport').focus({preventScroll:true});sound.play('bell');$('gameOverlay').hidden=true;$('pauseGame').disabled=false;$('pauseGame').textContent='Pause';}
  function select(next){$('opponentHud').dataset.opening='false';practiceGuard=false;$('practiceGuard').setAttribute('aria-pressed','false');sound.setScene(next,false);mode=next;world.select(next);boxing.environment.visible=next==='zombies';$('opponentHud').hidden=true;arena.visible=['saber','shield'].includes(next);strikeZone.visible=next==='saber';street.visible=!['bird','zombies','sword','spell'].includes(next);sky.visible=next==='bird';scene.background.set(next==='bird'?'#9fcbd0':'#0b1018');scene.fog.color.copy(scene.background);scene.fog.density=next==='bird'?.025:.075;extra.reset(next);spells.select(next==='spell');extraResult=null;player.visible=next!=='bird';active=false;state='menu';clear();elapsed=0;hits=kills=targetScore=boxingScore=spawned=0;lives=5;wave=1;document.body.classList.toggle('arcade-active',active);$('gameHud').hidden=!active;$('gameOverlay').hidden=!active;$('gameToolbar').hidden=!active;document.body.classList.remove('in-game');
+ $('roundChallenge').hidden=true;$('roundResults').hidden=true;$('nextRound').hidden=true;
  const index=GAME_ORDER.indexOf(next);$('selectedGameName').textContent=GAMES[next].name;$('selectedGameNumber').textContent=`${String(index+1).padStart(2,'0')} / ${String(GAME_ORDER.length).padStart(2,'0')}`;
  const g=GAMES[next];
  $('lobbyNotice').textContent=input==='practice'?'Practice · calories paused':'';
@@ -92,6 +110,7 @@ export function createArcade(renderer,getTracking){
  $('previousGame').onclick=()=>changeGame(-1);$('nextGame').onclick=()=>changeGame(1);
  $('gamePicker').addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();changeGame(e.key==='ArrowLeft'?-1:1);}});
  $('playGame').onclick=$('startGame').onclick=start;
+ $('nextRound').onclick=()=>{if(state!=='over')return;select(GAME_ORDER[(GAME_ORDER.indexOf(mode)+1)%GAME_ORDER.length]);start();};
  function lobby(){if(state==='playing'||state==='paused')finish(true);fullscreen.exit();select(mode);$('playGame').focus();}
  $('backLobby').onclick=$('overlayLobby').onclick=lobby;
  $('pauseGame').onclick=()=>state==='playing'?pause():state==='paused'?start():null;
@@ -141,15 +160,15 @@ export function createArcade(renderer,getTracking){
 
    let landed=false;const hitBodies=sweeps.length?living.map(e=>({e,capsules:boxing.hitVolumes(e)})):[];
    for(const sweep of sweeps){if(landed||state!=='playing')break;for(const {e,capsules} of hitBodies){const center=new T.Vector3(...sweep.b);if(punchHitsBody(sweep,capsules)){
-    detector.consume();landed=true;hits++;combo=elapsed-lastHit<4?combo+1:1;lastHit=elapsed;e.flash=.2+sweep.damage*.002;e.attack=0;const dead=strike(e,sweep.damage);e.health.forEach((h,i)=>{h.scale.x=.13*T.MathUtils.clamp(e.hp/e.maxHp*2-i,0,1);});const impactDirection=new T.Vector3().fromArray(sweep.b).sub(new T.Vector3().fromArray(sweep.a)).normalize();e.hitSide=impactDirection.x;e.hitLift=sweep.type==='uppercut'?1:0;
+    detector.consume();landed=true;hits++;combo=elapsed-lastHit<4?combo+1:1;lastHit=elapsed;bestCombo=Math.max(bestCombo,combo);e.flash=.2+sweep.damage*.002;e.attack=0;const dead=strike(e,sweep.damage);e.health.forEach((h,i)=>{h.scale.x=.13*T.MathUtils.clamp(e.hp/e.maxHp*2-i,0,1);});const impactDirection=new T.Vector3().fromArray(sweep.b).sub(new T.Vector3().fromArray(sweep.a)).normalize();e.hitSide=impactDirection.x;e.hitLift=sweep.type==='uppercut'?1:0;
     $('strikeReadout').textContent=`${sweep.type.toUpperCase()} · ${sweep.peakSpeed.toFixed(1)} m/s est. · ${sweep.damage} damage`;
     if(dead){kills++;boxingScore+=e.points;e.dead=.001;feedback(`${sweep.type.toUpperCase()} · KNOCKOUT +${e.points}`,{kind:'knockout',point:center,power:sweep.damage/65,direction:impactDirection});}else{e.root.position.z-=.10+sweep.damage*.0015;feedback(`${sweep.type.toUpperCase()} · −${sweep.damage} HP`,{kind:'punch',point:center,power:sweep.damage/65,direction:impactDirection});}break;
    }}}
    for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.dead){e.dead+=dt;e.root.rotation.x=-Math.min(Math.PI/2,e.dead*2.2);e.root.rotation.z=(e.hitSide||Math.sin(e.index+1)*.4)*e.dead*.7;e.root.position.z-=dt*.9;e.root.position.y=-Math.max(0,e.dead-.35)*.15;if(e.dead>1.1){removeObject(e.root);enemies.splice(i,1)}}}
   }else if(mode==='targets'){
    if(target){target.ring.rotation.z=elapsed;target.ring.scale.setScalar(1+Math.sin(elapsed*5)*.06);}
-   for(const sweep of sweeps){if(target&&sweptHit(sweep.a,sweep.b,target.root.position.toArray(),.23)){detector.consume();hits++;const bullseye=sweptHit([sweep.a[0],sweep.a[1],0],[sweep.b[0],sweep.b[1],0],[target.root.position.x,target.root.position.y,0],.09);const points=(bullseye?150:100)+Math.max(0,Math.round(30-(elapsed-target.born)*5));targetScore+=points;feedback(`${bullseye?'BULLSEYE':'TARGET'} +${points}`,{kind:'target',point:target.root.position,power:bullseye?1.2:.7});practiceTarget();break;}}
-   if(elapsed>=45)finish();
+   for(const sweep of sweeps){if(target&&sweptHit(sweep.a,sweep.b,target.root.position.toArray(),.23)){detector.consume();hits++;const bullseye=sweptHit([sweep.a[0],sweep.a[1],0],[sweep.b[0],sweep.b[1],0],[target.root.position.x,target.root.position.y,0],.09);const points=(bullseye?150:100)+Math.max(0,Math.round(30-(elapsed-target.born)*5));targetScore+=points;if(bullseye)bullseyes++;feedback(`${bullseye?'BULLSEYE':'TARGET'} +${points}`,{kind:'target',point:target.root.position,power:bullseye?1.2:.7});practiceTarget();break;}}
+   if(elapsed>=45)finish(false,roundLimit>0);
   }else if(mode==='spell'){extraResult=spells.tick(dt,fist,sweeps,$('impactEffects').checked);if(extraResult.consumed)detector.consume();if(extraResult.over)finish();
   }else {extraResult=extra.tick(dt,fist,qLower,input==='practice',action,wristSamples);if(extraResult?.over)finish();}
 
@@ -170,7 +189,8 @@ export function createArcade(renderer,getTracking){
  $('practicePunch').disabled=state!=='playing';$('practiceGuard').disabled=state!=='playing';
  $('immersiveAction').hidden=input!=='practice';$('immersiveAction').disabled=state!=='playing';$('immersivePause').textContent=state==='paused'?'Resume':'Pause';$('immersivePause').disabled=!['playing','paused'].includes(state);
  $('gameDetail').textContent=extraResult?.detail||'';
- $('bestScore').textContent=best[mode]||0;
+ $('bestScore').textContent=records.best(mode,input,Number($('roundDuration').value));$('bestScoreLabel').textContent=input==='practice'?'Practice best':'Live best';
+ const challenge=roundChallenge(mode,roundStats());$('roundChallenge').hidden=state!=='playing';$('roundChallenge').textContent=challenge.complete?`✓ ${challenge.label}`:`${challenge.short} ${challenge.current}/${challenge.goal}`;$('roundChallenge').dataset.complete=String(challenge.complete);if(state==='playing'&&challenge.complete&&!challengeDone){challengeDone=true;sound.play('challenge');}
  }
  if(!active){
   player.visible=false;extra.group.visible=false;extra.preview(now);if(mode==='spell')spells.preview(now,dt);const travel=$('cameraMotion').checked?Math.sin(now*.00013)*.5:0;
