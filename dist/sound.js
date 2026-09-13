@@ -73,6 +73,8 @@ export function createSound(environment={}){
   if(kind==='parry'){n(.08,5300,.22,'bandpass');[740,1110,1665].forEach((f,i)=>t(f,f*.998,.42,.1/(i+1),'sine',i*.008));t(130,50,.19,.17);return;}
   if(kind==='riposte'){n(.14,3800,.2,'bandpass');t(110,28,.3,.25);[67,74,79].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.4,.07,'triangle',i*.07));return;}
   if(kind==='block'){t(220,70,.22,.18);[440,660,995].forEach((f,i)=>t(f,f*.99,.34,.055/(i+1),'sine',i*.012));n(.13,3800,.13,'bandpass');return;}
+  if(kind==='perfectBlock'){t(200,65,.2,.16);[76,83,88].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.27,.055,'sine',i*.025));n(.07,4300,.1,'bandpass');return;}
+  if(kind==='shieldSurge'){t(130,520,.3,.09);[64,71,76,83].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.38,.07,'triangle',i*.055));n(.16,2000,.08,'bandpass');return;}
   if(kind==='hurt'){t(88,26,.28,.32);n(.25,650,.22);return;}
   if(kind==='miss'){t(230,160,.13,.045,'triangle');return;}
   if(kind==='step'){n(.055,220,.055);t(62,40,.06,.03);return;}

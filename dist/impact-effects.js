@@ -1,5 +1,5 @@
 import * as T from 'three';
-const COLORS={firebolt:'#ffaf72',arcSpell:'#a9a3ff',riseSpell:'#89f3d3',spellDeflect:'#8b8fae',parry:'#e3faff',riposte:'#afffe0',punch:'#ffd19b',knockout:'#ffe5ae',armor:'#d8e7ff',slash:'#8fffe5',block:'#88dfff',ring:'#ffdc79',target:'#c8ffa0',hurt:'#de785a',miss:'#c2c6c9'};
+const COLORS={perfectBlock:'#bcf4ff',shieldSurge:'#ffdf99',firebolt:'#ffaf72',arcSpell:'#a9a3ff',riseSpell:'#89f3d3',spellDeflect:'#8b8fae',parry:'#e3faff',riposte:'#afffe0',punch:'#ffd19b',knockout:'#ffe5ae',armor:'#d8e7ff',slash:'#8fffe5',block:'#88dfff',ring:'#ffdc79',target:'#c8ffa0',hurt:'#de785a',miss:'#c2c6c9'};
 
 // Fixed pools keep repeated hits from allocating geometry or growing draw calls.
 export function createImpactEffects(scene){
@@ -20,7 +20,7 @@ export function createImpactEffects(scene){
   for(let i=0;i<total;i++){const particle=particles[cursor++%count];particle.p.copy(p);particle.life=particle.total=.22+Math.random()*.42;particle.size=(.012+Math.random()*.018)*power;particle.spin=Math.random()*6;particle.v.set((Math.random()-.5)*3,(Math.random()-.3)*2.6,(Math.random()-.5)*2.4).multiplyScalar(power);if(direction)particle.v.addScaledVector(direction,.45);color.set(shade);shards.setColorAt((cursor-1)%count,color);}
   particlesActive=true;shards.instanceColor.needsUpdate=true;ring(p,kind,power);
   if(['slash','armor','parry','riposte','arcSpell','riseSpell'].includes(kind))ring(p,kind,power,true,direction?Math.atan2(direction.y,direction.x):-.5);
-  if(kind==='knockout'||kind==='riposte')ring(p,kind,power*1.6);
+  if(kind==='knockout'||kind==='riposte'||kind==='shieldSurge')ring(p,kind,power*1.6);
   flash.position.copy(p);flash.color.set(shade);flash.intensity=kind==='knockout'?6:3*power;
   glow=Math.min(.28,power*(kind==='hurt'?.25:.12));vignette.style.setProperty('--impact-color',kind==='hurt'?'201,72,53':kind==='block'?'99,190,236':'239,190,112');
  }

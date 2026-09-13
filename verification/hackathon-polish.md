@@ -52,6 +52,22 @@ The active goal is to improve UI, functionality, latency, sound, animation, dyna
 - Browser: after reload, Target Rush Practice/Quick best was 4,346; Live/Quick and Practice/Standard remained zero. Restored Quick and live input after testing. Batched castle/lobby visuals inspected; no console errors.
 - This is local rendering evidence, not a controlled before/after hardware latency benchmark. No physical IMU session or firmware changes in this pass.
 
+## Flight launch and Orbit Guard pass
+
+- Flight waits for the first valid downstroke before applying gravity, moving obstacles, advancing the round clock or accruing live fitness time. A compact launch cue disappears once flying. Bright-sky status labels now have suitable contrast, and the footer instruction has a small translucent backing.
+- Replaced Orbit Guard's frame-rate-dependent arrow smoothing with direct time-scaled movement and immediate tracked positions. Dragging projects the pointer onto the actual shield plane; practice hand animation follows the shield.
+- Added shrinking landing markers, centered-block bonuses, four-perfect-block shield surges, arcing meteors and faster ion bolts across escalating waves. The six hazards and markers are pooled. New layered perfect-block and surge sounds accompany the effects; results show perfect blocks.
+- The existing forgiving two-pose calibration and animated close-range zombie hit volumes remain present. The downloadable sketch matches the firmware source. Applying calibration changes to hardware still requires uploading that sketch.
+
+### Verification
+
+- All 74 Node tests and 24 JavaScript syntax checks passed. Guard tests cover movement at multiple frame rates, exact crossing-time collision, normal/perfect catches, surge expiry, bounded waves and one-time misses. Flight tests cover idle launch and invalid flaps as well as the existing obstacle-depth regressions.
+- The actual C++ calibration code again passed 2,000 arbitrary mounting cases, current T-pose initialization, relaxed tremor tolerance, brief-bump grace, bias averaging and sustained-movement rejection. No firmware changes or hardware flashing occurred in this pass.
+- Browser flight remained at 0 m / READY between checks; the first Flap changed the cue, advanced distance and enabled the round clock. Pause worked and practice calories remained zero.
+- Browser Orbit Guard: four directed perfect blocks scored 660, retained all five health points and activated a five-second wider-shield surge. A stationary run also reached mixed later waves, registered misses and displayed Blocks / Perfect / Best chain results correctly. Direction controls disable while paused or over.
+- Browser boxing: repeated recovered jabs at close range reduced a brawler's health and a further jab scored a 100-point knockout, advancing focus to the next runner. The test included a pause/resume. No browser console warnings or errors were recorded.
+- This verifies simulated controls and deterministic motion traces. Physical wearable feel and sensor-to-screen latency remain unmeasured.
+
 ## Continuing work
 
 - Further tune first-time game cues and character/impact animations without adding lobby clutter.

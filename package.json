@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check dist/app.js && node --check dist/protocol.js && node --check dist/game.js && node --check dist/game-logic.js && node --check dist/activity.js && node --check dist/extra-games.js && node --check dist/boxing-models.js && node --check dist/sound.js && node --check dist/motion.js && node --check dist/fullscreen.js && node --check dist/avatar.js && node --check dist/equipment.js && node --check dist/world-details.js && node --check dist/music.js && node --check dist/impact-effects.js && node --check dist/flight-logic.js && node --check dist/frame-budget.js && node --check dist/duel-logic.js && node --check dist/spell-logic.js && node --check dist/spell-game.js && node --check dist/scene-batch.js && node --check dist/round-results.js",
+    "check": "node --check dist/app.js && node --check dist/protocol.js && node --check dist/game.js && node --check dist/game-logic.js && node --check dist/activity.js && node --check dist/extra-games.js && node --check dist/boxing-models.js && node --check dist/sound.js && node --check dist/motion.js && node --check dist/fullscreen.js && node --check dist/avatar.js && node --check dist/equipment.js && node --check dist/world-details.js && node --check dist/music.js && node --check dist/impact-effects.js && node --check dist/flight-logic.js && node --check dist/frame-budget.js && node --check dist/duel-logic.js && node --check dist/spell-logic.js && node --check dist/spell-game.js && node --check dist/scene-batch.js && node --check dist/round-results.js && node --check dist/guard-logic.js && node --check dist/guard-game.js",
     "start": "python3 -m http.server 5173 --bind 127.0.0.1 --directory dist"
   }
 }

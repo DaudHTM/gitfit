@@ -1,4 +1,4 @@
-import {FlightDynamics,FLIGHT} from './motion.js?v=results-pass2';
+import {FlightDynamics,FLIGHT} from './motion.js?v=guard-pass2';
 
 export function flightGate(index,z=-12){
  const centers=[2.6,3.2,2.3,3.7,2.8,2.1,3.3,2.5];
@@ -18,9 +18,10 @@ export function flightGateHit(gate,oldZ,newZ,oldY,newY){
 
 export class FlightCourse {
  constructor(){this.flight=new FlightDynamics();this.reset();}
- reset(){this.flight.reset();this.time=0;this.distance=0;this.score=0;this.passed=0;this.over=false;this.index=0;this.gates=[];for(let i=0;i<3;i++)this.gates.push(flightGate(this.index++,-12-i*FLIGHT.spacing));}
+ reset(){this.flight.reset();this.started=false;this.time=0;this.distance=0;this.score=0;this.passed=0;this.over=false;this.index=0;this.gates=[];for(let i=0;i<3;i++)this.gates.push(flightGate(this.index++,-12-i*FLIGHT.spacing));}
+ flap(f){if(this.over||!Number.isFinite(f?.lift)||f.lift<=0)return false;this.started=true;this.flight.impulse(f);return true;}
  step(dt){
-  const events=[];if(this.over||dt<=0||dt>.25)return events;
+  const events=[];if(this.over||!this.started||!Number.isFinite(dt)||dt<=0||dt>.25)return events;
   const oldY=this.flight.y;this.time+=dt;this.distance+=FLIGHT.speed*dt;
   if(this.flight.step(dt)){this.over=true;events.push({type:'crash',reason:this.flight.y<1?'ground':'ceiling'});return events;}
   for(const gate of this.gates){

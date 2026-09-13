@@ -19,7 +19,7 @@ export function resultMetrics(mode,s={}){
   saber:[['Slices',n('totalHits')],['Best chain',n('bestCombo')],['Health',`${n('hp')} / 5`]],
   sword:[['Parries',n('parries')],['Finishes',n('finishes')],['Best chain',n('bestCombo')]],
   spell:[['Shattered',n('defeated')],['Matched',`${n('accuracy')}%`],['Best chain',n('bestCombo')]],
-  shield:[['Blocks',n('totalHits')],['Best chain',n('bestCombo')],['Health',`${n('hp')} / 5`]],
+  shield:[['Blocks',n('totalHits')],['Perfect',n('perfects')],['Best chain',n('bestCombo')]],
   targets:[['Targets hit',n('hits')],['Bullseyes',n('bullseyes')],['Round time',seconds]]
  };return metrics[mode]||[];
 }

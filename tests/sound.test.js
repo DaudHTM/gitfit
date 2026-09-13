@@ -62,5 +62,5 @@ test('mute, independent sliders, scene changes, and long scheduling gaps do not 
 
 test('all action cues construct finite, bounded envelopes',async()=>{
  const f=audioFixture();f.sound.unlock();await Promise.resolve();
- for(const kind of ['punch','knockout','armor','slash','slashSwing','block','hurt','miss','flap','step','growl','target','ring','bell','beat','finish','defeat','select','warning','parry','riposte','firebolt','arcSpell','riseSpell','spellDeflect','challenge']){f.sound.play(kind,{power:1.6,pan:-.7});assert.ok(f.sound.status.voices>0);f.ctx.advance(2);assert.equal(f.sound.status.voices,0);}
+ for(const kind of ['punch','knockout','armor','slash','slashSwing','block','hurt','miss','flap','step','growl','target','ring','bell','beat','finish','defeat','select','warning','parry','riposte','firebolt','arcSpell','riseSpell','spellDeflect','challenge','perfectBlock','shieldSurge']){f.sound.play(kind,{power:1.6,pan:-.7});assert.ok(f.sound.status.voices>0);f.ctx.advance(2);assert.equal(f.sound.status.voices,0);}
 });

@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {BOXING_STOP_Z} from './game-logic.js?v=results-pass2';
+import {BOXING_STOP_Z} from './game-logic.js?v=guard-pass2';
 import {batchStaticMeshes} from './scene-batch.js';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.

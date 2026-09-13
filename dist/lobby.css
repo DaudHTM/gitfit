@@ -53,3 +53,16 @@
 .game-shell .overlay-card:has(#roundResults:not([hidden])) #startGame{border-radius:3px}
 @media(max-width:780px){#roundChallenge{left:15px;top:81px;font-size:10px}.game-shell #nextRound{display:block;width:100%;margin:9px 0 0}.game-shell .overlay-card:has(#roundResults:not([hidden])) #startGame{width:100%}.game-shell .overlay-card:has(#roundResults:not([hidden])) h2{font-size:28px}.result-metrics{gap:8px;margin:17px 0 14px;padding:14px 0}.result-metrics dd{font-size:21px}}
 @media(max-height:600px){.game-shell .overlay-card:has(#roundResults:not([hidden])) h2{font-size:25px}.result-score strong{font-size:52px}.result-metrics{margin:12px 0;padding:10px 0}#roundResults #resultFitness{margin-bottom:8px}}
+
+#guardControls{display:flex;gap:6px}#guardControls button{width:38px;height:36px;padding:0;border-radius:3px;font-size:19px;background:#173440d9;border-color:#799aa366}#guardControls button:active{background:#b4dce5;color:#172b33}
+#hitFeedback[data-kind="perfectBlock"]{color:#bcefff}#hitFeedback[data-kind="shieldSurge"]{color:#ffe1aa;font-size:clamp(28px,3.2vw,42px)}
+
+/* Flight's bright sky needs dark labels outside the shaded score strip. */
+.game-shell.in-game[data-game="bird"] #gameState,.game-shell.in-game[data-game="bird"] #liveEnergy{color:#193e45!important;text-shadow:0 1px 2px #dcf1ec80}
+.game-shell.in-game[data-game="bird"] #roundChallenge{color:#193e45;text-shadow:0 1px 2px #dcf1ec80}
+.game-shell.in-game[data-game="bird"] .motion-readout{color:#e4f0eb;background:#16313bbc;padding:6px 9px;border-radius:3px}
+.game-shell.in-game[data-game="bird"] #gameToolbar label{color:#e4f0eb;text-shadow:0 1px 3px #16313b}
+.game-shell.in-game[data-game="bird"] #gameToolbar select{color:#edf0e9;text-shadow:none}
+.game-shell.in-game[data-game="bird"] #roundChallenge[data-complete="true"]{color:#174e38}
+.game-shell.in-game[data-game="bird"] #opponentHud{padding:10px 16px;background:#142c37b8;border-radius:4px;color:#edf6ed}
+.game-shell.in-game[data-game="bird"] #opponentCue{color:#d4e8e5}
