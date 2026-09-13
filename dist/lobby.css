@@ -66,3 +66,14 @@
 .game-shell.in-game[data-game="bird"] #roundChallenge[data-complete="true"]{color:#174e38}
 .game-shell.in-game[data-game="bird"] #opponentHud{padding:10px 16px;background:#142c37b8;border-radius:4px;color:#edf6ed}
 .game-shell.in-game[data-game="bird"] #opponentCue{color:#d4e8e5}
+
+/* Large, glanceable movement and energy counters, kept clear of the opponent. */
+#fitnessHud{position:absolute;right:30px;top:150px;z-index:2;width:168px;padding:14px 16px;background:#0e1b25b8;border:1px solid #acc9c51c;border-radius:4px;text-align:right;pointer-events:none}
+#fitnessHud>div+div{margin-top:17px;padding-top:14px;border-top:1px solid #a0bdbb30}
+#fitnessHud span{display:block;font-size:9px;letter-spacing:1.8px;color:#b9cdcb}
+#fitnessHud strong{display:block;font-size:48px;font-weight:500;line-height:1.1;letter-spacing:-1.8px;font-variant-numeric:tabular-nums;color:#f2d4a7}
+#fitnessHud small{font-size:11px;letter-spacing:.3px;color:#b9cdcb}
+#fitnessHud #liveEnergy{position:static;font-size:48px!important;letter-spacing:-1.8px!important;color:#f2d4a7!important;text-shadow:none!important}
+#gameChrome #gameSound{top:auto;bottom:70px}
+@media(max-width:780px){#fitnessHud{right:15px;top:192px;width:124px;padding:11px 12px}#fitnessHud strong,#fitnessHud #liveEnergy{font-size:34px!important}#fitnessHud span{font-size:8px;letter-spacing:1px}#fitnessHud>div+div{margin-top:10px;padding-top:10px}#gameChrome #gameSound{bottom:56px;right:12px}}
+@media(max-height:580px) and (min-width:781px){#fitnessHud{top:135px;display:flex;gap:20px;width:auto;text-align:left}#fitnessHud>div+div{margin:0;padding:0 0 0 20px;border-top:0;border-left:1px solid #a0bdbb30}#fitnessHud strong,#fitnessHud #liveEnergy{font-size:34px!important}}

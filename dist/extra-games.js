@@ -1,47 +1,14 @@
 import * as T from 'three';
-import {createSword,createBird} from './equipment.js';
-import {sweptHit} from './game-logic.js?v=guard-pass2';
-import {FlapTracker,FLIGHT,gripQuaternion,SABER_CUE_START_Z} from './motion.js?v=guard-pass2';
-import {SwordDuel,bladesMeet,BladeHistory} from './duel-logic.js';
+import {createBird} from './equipment.js';
+import {FlapTracker,FLIGHT} from './motion.js';
 import {createGuardGame} from './guard-game.js';
-import {FlightCourse} from './flight-logic.js?v=guard-pass2';
-export const GAMES={
- zombies:{name:'Zombie Boxing',title:'DEAD / AHEAD',tag:'POWER BOXING',intro:'Make every punch count.',help:'Jab forward, hook in a sideways arc, or uppercut in an upward arc. Faster wrist motion deals more damage. Recover between strikes.'},
- targets:{name:'Target Rush',title:'TARGET / RUSH',tag:'PRECISION · 45 SECONDS',intro:'Aim for the center.',help:'Strike glowing targets with jabs, hooks, or uppercuts. Center hits and quick reactions earn bonus points.'},
- spell:{name:'Spell Rush',title:'SPELL / RUSH',tag:'GESTURE MAGIC',intro:'Break the ward.',help:'Match the enemy’s gesture: jab forward for Firebolt, hook sideways for Arc, uppercut upward for Rise. Later wards need two different spells. Five defeated enemies trigger double points. Practice: choose Punch, then Space, or press 1 / 2 / 3 to cast.'},
- bird:{name:'Bird Flight',title:'SKY / BOUND',tag:'FLAP SURVIVAL',intro:'Find the gap.',help:'Your first downstroke starts the flight. Flap down to rise; coast to descend. Forward movement is automatic. Stay between the upper and lower obstacles. A collision ends the flight. Space, tap the scene, or use Flap in practice.'},
- saber:{name:'Neon Saber',title:'NEON / SABER',tag:'RHYTHM · 60 SECONDS',intro:'Slice into the rhythm.',help:'Swing through the blocks when they reach the glowing strike plane. Time your cuts to the pulse to build a combo. Space swings in practice.'},
- sword:{name:'Sword Arena',title:'BLADE / ARENA',tag:'PARRY DUELS',intro:'Read the blade.',help:'Cross your sword with the incoming blade to parry, then make a new slash during the opening for a one-hit finish. Striking guarded armor will not deal damage. Practice: hold G or toggle Guard to block; Space counterattacks.'},
- shield:{name:'Orbit Guard',title:'ORBIT / GUARD',tag:'DEFENSE · 60 SECONDS',intro:'Become the shield.',help:'Move the shield onto each shrinking landing marker. Centered blocks score extra; four perfect blocks expand your shield for five seconds. Meteors and faster ion bolts arrive in varied waves. Practice: arrows, direction buttons, or drag in the scene.'}
-};
-// The grip is a rigid 90° rotation: blade +Y becomes hand -Z, perpendicular to forearm -Y.
-export const GRIP_ROTATION=new T.Quaternion().fromArray(gripQuaternion([0,0,0,1]));
+import {FlightCourse} from './flight-logic.js';
 export function createExtraGames(scene,mesh,geo,feedback,sound,camera){
- const group=new T.Group();scene.add(group);const objects=[],effects=[];
- const guard=createGuardGame(group,camera,feedback,sound);
- const weapon=createSword(),sword=weapon.root;group.add(sword);
- const trailArray=new Float32Array(24),trailGeometry=new T.BufferGeometry();trailGeometry.setAttribute('position',new T.BufferAttribute(trailArray,3));
- const trail=new T.Line(trailGeometry,new T.LineBasicMaterial({color:'#84f1df',transparent:true,opacity:.65,depthWrite:false}));trail.frustumCulled=false;group.add(trail);let trailPoints=[];const enemySwordTemplate=createSword().root,bladeHistory=new BladeHistory();let practiceSwing=0,parries=0,finishes=0,bestCombo=0,totalHits=0;
+ const group=new T.Group();scene.add(group);const guard=createGuardGame(group,camera,feedback,sound);
  const raptor=createBird(),bird=raptor.root,body=raptor.body,wings=raptor.wings;group.add(bird);
- const saberEdgeGeometry=new T.EdgesGeometry(geo.box),saberEdgeMaterial=new T.LineBasicMaterial({color:'#e8ffff'});
- const flaps=new FlapTracker(),course=new FlightCourse(),flight=course.flight,gateMeshes=new Map();
- let mode,time,next,score,hp,combo,lastTip,lastBase,actionAt,clock,spawnIndex,prevTime,wingStroke=0,viewBehind=false,lastSwing=-10;
- const position=new T.Vector3();
- function remove(o){o.root.userData.disposable?.forEach(x=>x.dispose());group.remove(o.root);const i=objects.indexOf(o);if(i>=0)objects.splice(i,1);}
- function burst(center,color,split=false){for(let i=0;i<(split?2:8);i++){const root=mesh(geo.box,color,group,center.toArray(),split?[.12,.25,.25]:[.025,.025,.025]);effects.push({root,v:new T.Vector3((i%2?1:-1)*(split?1.2:Math.random()),Math.random()+.4,(Math.random()-.5)),life:.55});}}
- function reset(m){[...objects].forEach(remove);effects.forEach(e=>group.remove(e.root));effects.length=0;mode=m;time=0;next=1;score=0;hp=5;combo=0;lastTip=lastBase=null;actionAt=-10;clock=0;spawnIndex=0;prevTime=null;position.set(0,1.3,-.5);flaps.reset();course.reset();guard.reset(m==='shield');for(const root of gateMeshes.values())group.remove(root);gateMeshes.clear();if(m==='bird')syncGates();trailPoints=[];wingStroke=0;lastSwing=-10;practiceSwing=0;parries=0;finishes=0;bestCombo=0;totalHits=0;bladeHistory.reset();if(m==='sword'){spawn(-2.4);next=5.5;}
-  group.visible=!['zombies','targets','lab'].includes(m);sword.visible=m==='sword'||m==='saber';trail.visible=sword.visible;trail.material.opacity=0;weapon.setMode(m);bird.visible=m==='bird';
- }
- function spawn(z=-5){const root=new T.Group();group.add(root);const i=spawnIndex++,color=i%2?'#bf99ff':'#86f5e1';let arms=[];
-  if(mode==='saber'){root.position.set(.2+(i%3-1)*.07,1.4+(i%2)*.07,-5);mesh(geo.box,color,root,[0,0,0],[.25,.25,.25]);const edge=new T.LineSegments(saberEdgeGeometry,saberEdgeMaterial);edge.scale.setScalar(.257);root.add(edge);mesh(geo.box,'#ffffff',root,[0,0,.13],[.13,.026,.008]);}
-  else{root.position.set(.15,0,z);mesh(geo.sphere,'#91abc6',root,[0,1.48,0],[.15,.18,.15]);mesh(geo.sphere,'#526d87',root,[0,1.07,0],[.25,.29,.16]);mesh(geo.box,'#b4c9d7',root,[0,1.18,.16],[.16,.19,.025]);
-   for(const s of [-1,1]){mesh(geo.sphere,'#344b66',root,[s*.12,.44,0],[.095,.4,.1]);mesh(geo.sphere,'#b6cedb',root,[s*.23,1.29,0],[.095,.09,.1]);const arm=new T.Group();root.add(arm);arm.position.set(s*.25,1.24,0);mesh(geo.box,'#718b9d',arm,[0,-.16,.04],[.095,.34,.12]);arms.push(arm);mesh(geo.sphere,'#3d5569',root,[s*.12,.1,.05],[.1,.07,.14]);}
-   mesh(geo.box,'#a5f3ec',root,[0,1.49,.14],[.21,.035,.025]);
-  }
-  const duel=mode==='sword'?new SwordDuel(i):null,enemyWeapon=duel?enemySwordTemplate.clone(true):null;
-  if(enemyWeapon){root.add(enemyWeapon);mesh(geo.sphere,'#35485c',enemyWeapon,[0,-.07,0],[.044,.066,.044]);mesh(geo.box,duel.style.color,root,[0,1.05,.17],[.055,.25,.015]);}
-  objects.push({root,hp:2,hitAt:-10,attack:0,color,arms,duel,weapon:enemyWeapon,blade:null});
- }
+ const flaps=new FlapTracker(),course=new FlightCourse(),flight=course.flight,gateMeshes=new Map(),position=new T.Vector3();
+ let mode='zombies',clock=0,actionAt=-10,wingStroke=0,viewBehind=false;
+ function reset(m){mode=m;clock=0;actionAt=-10;wingStroke=0;flaps.reset();course.reset();guard.reset(m==='shield');for(const root of gateMeshes.values())group.remove(root);gateMeshes.clear();if(m==='bird')syncGates();group.visible=m!=='zombies';bird.visible=m==='bird';}
  function syncGates(){
   const visible=new Set(course.gates.map(g=>g.id));
   for(const [id,root] of gateMeshes)if(!visible.has(id)){group.remove(root);gateMeshes.delete(id);}
@@ -69,62 +36,8 @@ export function createExtraGames(scene,mesh,geo,feedback,sound,camera){
   for(const e of events)if(e.type==='crash')feedback(e.reason==='ground'?'GROUND HIT':e.reason==='ceiling'?'TOO HIGH':'OBSTACLE HIT',{kind:'hurt',point:position,power:.85});else feedback('GAP +100',{kind:'ring',point:new T.Vector3(0,(e.gate.bottom+e.gate.top)/2,FLIGHT.birdZ),power:.8});
   syncGates();return {score:course.score,hp:course.over?0:1,combo:course.passed,seconds:Math.floor(course.time),distance:Math.floor(course.distance),over:course.over,bird:position.clone(),speed:course.started?flight.speed:0,waiting:!course.started,opponent:!course.started?{name:'FLAP DOWN',cue:practice?'Space or Flap to launch':'Launch when ready',fraction:1,color:'#b9eee0'}:null,detail:!course.started?'First flap starts the flight':'Flap to climb · Coast to descend'};
  }
- function knightBlade(o){
-  const d=o.duel,phase=d.phase;let u=0;
-  if(phase==='swing')u=T.MathUtils.clamp(d.time/d.style.swing,0,1);
-  if(phase==='recover'||phase==='open'||phase==='dead')u=1;
-  const hilt=new T.Vector3(.3,1.42-u*.27,.20+u*.28),direction=new T.Vector3(.15-u*1.1,.94-u*1.22,.15).normalize();
-  if(phase==='approach'||phase==='guard'){hilt.set(.32,1.08,.22);direction.set(-.3,.8,.2).normalize();}
-  if(phase==='open'){hilt.x+=.15;direction.set(.7,.3,-.2).normalize();}
-  o.weapon.position.copy(hilt);o.weapon.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction);
-  const arm=o.arms[1],reach=hilt.clone().sub(arm.position);arm.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),reach.normalize());arm.scale.y=hilt.distanceTo(arm.position)/.32;
-  o.root.updateMatrixWorld(true);
-  return {base:o.weapon.localToWorld(new T.Vector3(0,.025,0)).toArray(),tip:o.weapon.localToWorld(new T.Vector3(0,.72,0)).toArray()};
- }
- function pose(fist,q){sword.position.copy(fist).add(new T.Vector3(0,-.07,-.075).applyQuaternion(q));sword.quaternion.copy(q).multiply(GRIP_ROTATION);}
- function tick(dt,fist,q,practice,action,samples=[]){
-  if(!group.visible)return null;time+=dt;clock+=dt;
-  if(mode==='bird')return tickFlight(dt,practice,action,samples);
-  if(mode==='shield')return guard.tick(dt,fist,practice,samples);
-  pose(fist,q);
-  const base=sword.position.clone(),tip=new T.Vector3(0,.72,0).applyQuaternion(sword.quaternion).add(base);const speed=lastTip?tip.distanceTo(lastTip)/Math.max(dt,.001):0;
-  if(sword.visible&&!practice&&speed>.8&&clock-lastSwing>.3){sound.play('slashSwing',{power:Math.min(1.5,speed/3),pan:fist.x*.7});lastSwing=clock;}
-  if(sword.visible){trailPoints.unshift(tip.clone());if(trailPoints.length>8)trailPoints.pop();for(let i=0;i<8;i++)(trailPoints[i]||tip).toArray(trailArray,i*3);trailGeometry.attributes.position.needsUpdate=true;trail.material.opacity=Math.min(.65,speed*.2);}
-  if(time>=next&&(mode!=='sword'||objects.filter(o=>!o.dead).length<3)){spawn();next=time+(mode==='saber'?1:mode==='sword'?Math.max(2.4,4-score/3000):Math.max(.8,1.8-score/3000));if(mode==='saber')sound.play('beat');}
-  const duelOrder=mode==='sword'?objects.filter(o=>!o.dead).sort((a,b)=>b.root.position.z-a.root.position.z):[];
-  const bladeSweeps=sword.visible?bladeHistory.consume(practice?[{p:fist.toArray(),q:q.toArray(),time:clock*1000}]:samples):[];
-  if(practice&&action)practiceSwing++;const heldBlade={base:base.toArray(),tip:tip.toArray()};
-  const paths=bladeSweeps.length?bladeSweeps:[{current:heldBlade,previous:heldBlade,speed:0,id:bladeHistory.stroke.id}];
-  for(let i=objects.length-1;i>=0;i--){const o=objects[i];if(o.dead){o.dead+=dt;o.root.rotation.x=-Math.min(1.5,o.dead*2.6);o.root.position.z-=dt*.7;o.root.scale.setScalar(Math.max(.05,1-o.dead*.7));if(o.dead>.65)remove(o);continue;}o.recoil=Math.max(0,(o.recoil||0)-dt*3);o.root.position.z+=dt*(mode==='saber'?4.5:1);let hit=false,miss=false;
-    if(mode==='sword'){
-     const rank=duelOrder.indexOf(o),limit=rank?duelOrder[rank-1].root.position.z-1.15:-.95;o.root.position.z=Math.min(limit,o.root.position.z);const engaged=rank===0&&o.root.position.z>=-.97;
-     const event=o.duel.step(dt,engaged);o.root.rotation.z=Math.sin(time*3+i)*.012+o.recoil*.08;o.root.rotation.x=o.duel.phase==='open'?-.10:-o.recoil*.12;
-     if(event==='warn')sound.play('warning');if(event==='swing')sound.play('slashSwing',{power:.8});if(event==='hurt'){hp--;combo=0;feedback('MISSED PARRY −1',{kind:'hurt',point:new T.Vector3(0,1.4,-.3)});}
-     const enemyBlade=knightBlade(o),center=o.root.position.clone().add(new T.Vector3(0,1.35,.05)),centerArray=center.toArray();
-     for(const path of paths){
-      const strokeId=practice?practiceSwing:path.id;
-      const parried=engaged&&o.duel.canParry&&bladesMeet(path.current,enemyBlade,path.previous,o.blade||enemyBlade)&&o.duel.parry(strokeId);
-      if(parried){parries++;if(o.duel.parries===1)score+=25;o.recoil=1;feedback(o.duel.parries===1?'PARRY +25 · COUNTER NOW':'PARRY · COUNTER NOW',{kind:'parry',point:base.clone().lerp(tip,.5),power:1.2});}
-      const contact=sweptHit(path.previous.tip,path.current.tip,centerArray,.34)||sweptHit(path.current.base,path.current.tip,centerArray,.32);
-      if(engaged&&o.duel.counter(strokeId,path.speed,contact)){const points=o.duel.style.points+combo*25;score+=points;combo++;bestCombo=Math.max(bestCombo,combo);finishes++;o.dead=.001;feedback(`RIPOSTE +${points}`,{kind:'riposte',point:center,power:1.35,direction:new T.Vector3(...path.current.tip).sub(new T.Vector3(...path.previous.tip)).normalize()});break;}
-      else if(!parried&&engaged&&contact&&path.speed>.8&&o.duel.phase!=='open'&&clock-o.hitAt>.6){o.hitAt=clock;feedback('PARRY FIRST',{kind:'armor',point:center,power:.45});}
-     }
-     o.blade=enemyBlade;
-     continue;
-    }
-    const center=o.root.position.clone();
-    const inTime=Math.abs(o.root.position.z+.5)<.36;
-    hit=inTime&&clock-o.hitAt>.6&&paths.some(path=>path.speed>.55&&(sweptHit(path.previous.tip,path.current.tip,center.toArray(),.23)||sweptHit(path.current.base,path.current.tip,center.toArray(),.19)||sweptHit(path.previous.base,path.current.base,center.toArray(),.2)));
-    miss=o.root.position.z>.02;
-   if(hit){const points=100+combo*10;score+=points;combo++;totalHits++;bestCombo=Math.max(bestCombo,combo);burst(o.root.position.clone(),o.color,true);const point=o.root.position.clone();remove(o);feedback(`SLICE +${points} · ${combo}×`,{kind:'slash',point,power:Math.min(1.5,speed/3),direction:lastTip?tip.clone().sub(lastTip).normalize():null});}
-   else if(miss){combo=0;hp--;remove(o);feedback('MISSED −1',{kind:'hurt',point:new T.Vector3(0,1.4,-.3),power:.55});}
-  }
-  for(let i=effects.length-1;i>=0;i--){const e=effects[i];e.life-=dt;e.v.y-=dt*2;e.root.position.addScaledVector(e.v,dt);e.root.rotation.z+=dt*3;if(e.life<=0){group.remove(e.root);effects.splice(i,1);}}
-  lastTip=tip;lastBase=base;prevTime=time;
-  const opponent=duelOrder.find(o=>!o.dead),duel=opponent?.duel;
-  const cue=duel?(duel.phase==='open'?'COUNTER NOW':duel.canParry?'PARRY NOW':duel.phase==='windup'?'Incoming blade':duel.phase==='approach'?'Approaching':'Cross swords to parry'):'';
-  return {score,hp,combo,parries,finishes,bestCombo,totalHits,opponent:duel?{name:duel.style.name,cue,opening:duel.phase==='open',fraction:duel.phase==='open'?1-duel.time/duel.style.opening:duel.phase==='windup'?duel.time/duel.style.windup:1}:null,seconds:Math.max(0,Math.ceil(60-time)),over:hp<=0||(mode!=='sword'&&time>=60),detail:mode==='saber'?(objects.some(o=>o.root.position.z>SABER_CUE_START_Z&&o.root.position.z<-.3)?'CUT NOW':'120 BPM · cut every 2 beats'):mode==='sword'?'Parry → new slash · one-hit finish':`${combo} consecutive blocks`};
- }
+
+ function tick(dt,fist,q,practice,action,samples=[]){if(!group.visible)return null;clock+=dt;return mode==='bird'?tickFlight(dt,practice,action,samples):guard.tick(dt,fist,practice,samples);}
  function preview(now){if(mode!=='bird')return;group.visible=true;bird.position.set(.3,2.3,-3);body.visible=true;bird.rotation.z=Math.sin(now*.0005)*.08;wings.forEach((w,i)=>w.rotation.z=(i?1:-1)*(.12+Math.sin(now*.002)*.22));}
- reset('zombies');return {reset,tick,pose,group,preview,nudgeShield:(x,y)=>guard.nudge(x,y),get waitingForFlap(){return mode==='bird'&&!course.started;},setView(behind){viewBehind=behind;body.visible=behind;},suspend(){guard.suspend();lastTip=lastBase=null;actionAt=-10;flaps.reset();bladeHistory.reset(true);}};
+ reset('zombies');return {reset,tick,group,preview,nudgeShield:(x,y)=>guard.nudge(x,y),get waitingForFlap(){return mode==='bird'&&!course.started;},setView(behind){viewBehind=behind;body.visible=behind;},suspend(){guard.suspend();actionAt=-10;flaps.reset();}};
 }

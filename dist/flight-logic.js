@@ -1,4 +1,4 @@
-import {FlightDynamics,FLIGHT} from './motion.js?v=guard-pass2';
+import {FlightDynamics,FLIGHT} from './motion.js?v=focus-pass2';
 
 export function flightGate(index,z=-12){
  const centers=[2.6,3.2,2.3,3.7,2.8,2.1,3.3,2.5];

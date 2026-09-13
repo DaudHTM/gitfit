@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {BOXING_STOP_Z} from './game-logic.js?v=guard-pass2';
+import {BOXING_STOP_Z} from './game-logic.js?v=focus-pass2';
 import {batchStaticMeshes} from './scene-batch.js';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.
@@ -71,7 +71,7 @@ export function createBoxingModels(scene) {
   return {root,body,head,chest,jaw,legs,arms,health,shirt,hp:2,attack:0,flash:0,dead:0,index,step:0};
  }
  function animate(e,time,dt){
-  const near=e.root.position.z>BOXING_STOP_Z-.07,gait=time*(near?2:5.5)+e.index*1.7;
+  const near=(e.distance??-e.root.position.z)<-BOXING_STOP_Z+.07,gait=time*(near?2:5.5)+e.index*1.7;
   const attack=e.attack/(e.attackPeriod||2.3),windup=T.MathUtils.smoothstep(attack,.60,.89),jab=T.MathUtils.smoothstep(attack,.89,.995);
   e.root.position.y=Math.abs(Math.sin(gait))*(near?.007:.024);
   e.chest.rotation.z=Math.sin(gait)*.035+e.flash*(e.hitSide||.3)*.6;
