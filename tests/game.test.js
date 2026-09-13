@@ -5,6 +5,13 @@ test('zombie dies on second distinct strike only',()=>{const z={hp:2};assert.equ
 test('stale sample cannot create a phantom punch',()=>{const p=new PunchTracker();p.sample([0,1,0],100);assert.equal(p.sample([0,1,-1],500),null);});
 import {nextOpponent,punchExtension} from '../dist/game-logic.js';
 import {sweptCapsuleHit,punchHitsBody,BOXING_STOP_Z} from '../dist/game-logic.js';
+import {zombieProfile} from '../dist/game-logic.js';
+test('early waves introduce distinct enemies and brutes survive two maximum-power hits',()=>{
+ const brawler=zombieProfile(0),runner=zombieProfile(1),brute=zombieProfile(2);
+ assert.ok(runner.speed>brawler.speed);assert.ok(runner.attackPeriod<brawler.attackPeriod);assert.ok(brute.hp>brawler.hp*2);
+ assert.equal(strike(brute,93),false);assert.equal(strike(brute,93),false);assert.equal(strike(brute,93),true);
+ assert.equal(zombieProfile(2).hp,220);assert.ok(zombieProfile(2,5).hp>220);assert.equal(zombieProfile(3).name,brawler.name);
+});
 test('close zombie head and body register short, inside, and fast glove sweeps',()=>{
  const z=BOXING_STOP_Z;
  const torso={a:[.16,1.06,z+.02],b:[.16,1.21,z+.02],radius:.235};

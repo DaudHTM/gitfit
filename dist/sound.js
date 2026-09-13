@@ -64,6 +64,9 @@ export function createSound(environment={}){
   if(kind==='whoosh'||kind==='slashSwing'||kind==='flap'){n(kind==='flap'?.26:.18,kind==='slashSwing'?3200:1100,.12,'bandpass');if(kind==='flap')n(.22,350,.09);return;}
   if(kind==='hit'||kind==='punch'||kind==='knockout'){t(150,38,.17,.3);t(62,27,.23,.2);n(.075,2100,.25);n(.2,450,.1);if(kind==='knockout'){t(85,22,.48,.22);n(.38,950,.17);[57,60,64].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.42,.065,'triangle',.05+i*.085));}return;}
   if(kind==='armor'||kind==='slash'){n(.17,4300,.2,'bandpass');[620,1027,1633].forEach((f,i)=>t(f,f*.8,.24+i*.065,.06/(i+1),'triangle'));if(kind==='slash')t(90,30,.22,.18);return;}
+  if(kind==='warning'){t(540,580,.11,.045,'sine');t(720,760,.12,.045,'sine',.16);return;}
+  if(kind==='parry'){n(.08,5300,.22,'bandpass');[740,1110,1665].forEach((f,i)=>t(f,f*.998,.42,.1/(i+1),'sine',i*.008));t(130,50,.19,.17);return;}
+  if(kind==='riposte'){n(.14,3800,.2,'bandpass');t(110,28,.3,.25);[67,74,79].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.4,.07,'triangle',i*.07));return;}
   if(kind==='block'){t(220,70,.22,.18);[440,660,995].forEach((f,i)=>t(f,f*.99,.34,.055/(i+1),'sine',i*.012));n(.13,3800,.13,'bandpass');return;}
   if(kind==='hurt'){t(88,26,.28,.32);n(.25,650,.22);return;}
   if(kind==='miss'){t(230,160,.13,.045,'triangle');return;}

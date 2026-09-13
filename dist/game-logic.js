@@ -2,6 +2,12 @@
 export function sweptHit(a,b,c,r){const d=b.map((v,i)=>v-a[i]);const n=d.reduce((s,v)=>s+v*v,0);const t=n?Math.max(0,Math.min(1,c.reduce((s,v,i)=>s+(v-a[i])*d[i],0)/n)):0;return c.reduce((s,v,i)=>s+(a[i]+t*d[i]-v)**2,0)<=r*r;}
 export const BOXING_STOP_Z=-.78;
 export const GLOVE_RADIUS=.13;
+const ZOMBIE_TYPES=[
+ {name:'Brawler',hp:100,speed:1,attackPeriod:2.3,points:100,build:1},
+ {name:'Runner',hp:70,speed:1.35,attackPeriod:1.85,points:125,build:.9},
+ {name:'Brute',hp:220,speed:.78,attackPeriod:2.85,points:225,build:1.2}
+];
+export function zombieProfile(index=0,wave=1){const type=ZOMBIE_TYPES[Math.abs(Math.floor(index))%ZOMBIE_TYPES.length];return {...type,hp:type.hp+Math.min(60,Math.max(0,Math.floor(wave-1))*8)};}
 // Distance between two segments: a moving glove versus an animated body capsule.
 // Includes strokes beginning inside a collider, and fast strokes crossing it.
 export function sweptCapsuleHit(a,b,c,d,r){

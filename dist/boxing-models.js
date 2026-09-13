@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {BOXING_STOP_Z} from './game-logic.js?v=controls-fix3';
+import {BOXING_STOP_Z} from './game-logic.js?v=demo-pass4';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.
 export function createBoxingModels(scene) {
@@ -21,13 +21,16 @@ export function createBoxingModels(scene) {
   return g;
  }
  const eyeMaterial=new T.MeshStandardMaterial({color:'#ffd08c',emissive:'#ff7840',emissiveIntensity:1.3});const shadowGeometry=new T.CircleGeometry(.31,24),shadowMaterial=new T.MeshBasicMaterial({color:'#07090a',transparent:true,opacity:.3,depthWrite:false});
- function fighter(index){
+ function fighter(index,profile={build:1}){
   const root=new T.Group();scene.add(root);
   const skin=['#8c9983','#909387','#80968b'][index%3],shirt=['#634843','#3f565d','#535042'][index%3];
   const pelvis=joint(root,[0,.82,0]);
   part(pelvis,sphere,'#343b3f',[0,0,0],[.19,.13,.13]);
   const chest=joint(root,[0,1.02,0]);
+  chest.scale.set(profile.build,1,profile.build);
   const body=part(chest,sphere,shirt,[0,.10,0],[.245,.28,.155]);
+  if(profile.name==='Brute')for(const side of [-1,1]){part(chest,box,'#978665',[side*.16,.25,.13],[.12,.14,.07],.5);part(chest,box,'#7e735f',[side*.09,.06,.16],[.12,.16,.035],.4);}
+  if(profile.name==='Runner')part(chest,box,'#80c6ca',[0,.17,.16],[.18,.036,.015]);
   part(chest,sphere,shirt,[-.12,.21,.065],[.13,.11,.1]);part(chest,sphere,shirt,[.12,.21,.065],[.13,.11,.1]);
   part(chest,cylinder,skin,[0,.36,0],[.067,.12,.067]);
   part(chest,box,'#2c3130',[0,.13,.146],[.027,.31,.012]);
@@ -68,7 +71,7 @@ export function createBoxingModels(scene) {
  }
  function animate(e,time,dt){
   const near=e.root.position.z>BOXING_STOP_Z-.07,gait=time*(near?2:5.5)+e.index*1.7;
-  const windup=T.MathUtils.smoothstep(e.attack,1.4,2.05),jab=T.MathUtils.smoothstep(e.attack,2.05,2.28);
+  const attack=e.attack/(e.attackPeriod||2.3),windup=T.MathUtils.smoothstep(attack,.60,.89),jab=T.MathUtils.smoothstep(attack,.89,.995);
   e.root.position.y=Math.abs(Math.sin(gait))*(near?.007:.024);
   e.chest.rotation.z=Math.sin(gait)*.035+e.flash*(e.hitSide||.3)*.6;
   e.chest.rotation.x=-windup*.09+jab*.3-e.flash*.7;
@@ -92,7 +95,7 @@ export function createBoxingModels(scene) {
  const key=new T.PointLight('#ffce9e',11,11,2);key.position.set(-1.5,3.3,1);environment.add(key);const rim=new T.PointLight('#74bcdf',18,15,2);rim.position.set(1.8,3,-4);environment.add(rim);
  function hitVolumes(e){
   e.root.updateMatrixWorld(true);
-  const capsule=(node,a,b,radius)=>({a:node.localToWorld(new T.Vector3(...a)).toArray(),b:node.localToWorld(new T.Vector3(...b)).toArray(),radius});
+  const capsule=(node,a,b,radius)=>{const scale=node.getWorldScale(new T.Vector3());return {a:node.localToWorld(new T.Vector3(...a)).toArray(),b:node.localToWorld(new T.Vector3(...b)).toArray(),radius:radius*Math.max(scale.x,scale.z)};};
   return [capsule(e.chest,[0,.04,.02],[0,.19,.02],.235),capsule(e.head,[0,-.06,.025],[0,.095,.015],.15)];
  }
  return {glove,fighter,animate,hitVolumes,environment};
