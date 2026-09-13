@@ -5,6 +5,7 @@ export const MUSIC_THEMES={
  saber:{bpm:120,root:42,scale:[0,3,5,7,10],chords:[0,5,3,7],lead:'sawtooth',air:950},
  bird:{bpm:76,root:48,scale:[0,2,4,7,9],chords:[0,5,7,0],lead:'sine',air:650},
  shield:{bpm:92,root:40,scale:[0,3,5,7,10],chords:[0,3,7,5],lead:'sine',air:450},
+ spell:{bpm:104,root:45,scale:[0,2,3,7,10],chords:[0,7,3,5],lead:'sine',air:320},
  targets:{bpm:108,root:45,scale:[0,2,4,7,9],chords:[0,5,7,5],lead:'triangle',air:420}
 };
 export const noteFrequency=midi=>440*2**((midi-69)/12);

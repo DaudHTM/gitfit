@@ -1,4 +1,5 @@
 import {sweptCapsuleHit} from './game-logic.js';
+import {gripQuaternion} from './motion.js';
 export const DUEL_STYLES=[
  {name:'Vanguard',windup:1.05,swing:.48,guard:.65,opening:1.65,points:200,color:'#8fbcc4'},
  {name:'Duelist',windup:.78,swing:.36,guard:.55,opening:1.35,points:250,color:'#c9a6df'},
@@ -50,5 +51,30 @@ export class BladeStroke {
    else if(dir.reduce((s,v,i)=>s+v*this.direction[i],0)>.3)this.tip=p;
   }
   return {id:this.id,speed};
+ }
+}
+
+function rotate([vx,vy,vz],[x,y,z,w]){const tx=2*(y*vz-z*vy),ty=2*(z*vx-x*vz),tz=2*(x*vy-y*vx);return [vx+w*tx+y*tz-z*ty,vy+w*ty+z*tx-x*tz,vz+w*tz+x*ty-y*tx];}
+export function bladePose(wrist,quaternion){
+ const offset=rotate([0,-.07,-.075],quaternion),axis=rotate([0,.72,0],gripQuaternion(quaternion));
+ const base=wrist.map((v,i)=>v+offset[i]);return {base,tip:base.map((v,i)=>v+axis[i])};
+}
+
+// Retain curved travel between rendered frames without queuing the displayed pose.
+export class BladeHistory {
+ constructor(){this.stroke=new BladeStroke();this.previous=null;}
+ reset(preserveId=false){this.previous=null;this.stroke.reset(preserveId);}
+ consume(samples){
+  const sweeps=[],latest=samples.at(-1)?.time;
+  if(this.previous&&latest-this.previous.time>100)this.reset(true);
+  for(const sample of samples.slice(-12)){
+   if(!Number.isFinite(sample.time)||latest-sample.time>100||!sample.p?.every(Number.isFinite)||!sample.q?.every(Number.isFinite)||sample.p.length!==3||sample.q.length!==4)continue;
+   if(this.previous&&sample.time<=this.previous.time)continue;
+   const current={...bladePose(sample.p,sample.q),time:sample.time};
+   const continuous=this.previous&&sample.time-this.previous.time<=150;
+   const motion=this.stroke.sample(current.tip,sample.time);
+   sweeps.push({current,previous:continuous?this.previous:current,speed:continuous?motion.speed:0,id:motion.id});this.previous=current;
+  }
+  return sweeps;
  }
 }

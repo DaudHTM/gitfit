@@ -65,6 +65,10 @@ export function createSound(environment={}){
   if(kind==='hit'||kind==='punch'||kind==='knockout'){t(150,38,.17,.3);t(62,27,.23,.2);n(.075,2100,.25);n(.2,450,.1);if(kind==='knockout'){t(85,22,.48,.22);n(.38,950,.17);[57,60,64].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.42,.065,'triangle',.05+i*.085));}return;}
   if(kind==='armor'||kind==='slash'){n(.17,4300,.2,'bandpass');[620,1027,1633].forEach((f,i)=>t(f,f*.8,.24+i*.065,.06/(i+1),'triangle'));if(kind==='slash')t(90,30,.22,.18);return;}
   if(kind==='warning'){t(540,580,.11,.045,'sine');t(720,760,.12,.045,'sine',.16);return;}
+  if(kind==='firebolt'){n(.24,1800,.17,'bandpass');t(240,45,.25,.18);[69,76].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m)*1.01,.26,.06,'triangle',i*.055));return;}
+  if(kind==='arcSpell'){n(.18,5600,.1,'highpass');[500,1100,1700].forEach((f,i)=>t(f,f*.55,.18,.085,'triangle',i*.035));return;}
+  if(kind==='riseSpell'){t(180,720,.24,.11);[74,81,86].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.32,.065,'sine',i*.045));return;}
+  if(kind==='spellDeflect'){t(360,180,.16,.065,'sine');n(.09,3000,.04,'bandpass');return;}
   if(kind==='parry'){n(.08,5300,.22,'bandpass');[740,1110,1665].forEach((f,i)=>t(f,f*.998,.42,.1/(i+1),'sine',i*.008));t(130,50,.19,.17);return;}
   if(kind==='riposte'){n(.14,3800,.2,'bandpass');t(110,28,.3,.25);[67,74,79].forEach((m,i)=>t(noteFrequency(m),noteFrequency(m),.4,.07,'triangle',i*.07));return;}
   if(kind==='block'){t(220,70,.22,.18);[440,660,995].forEach((f,i)=>t(f,f*.99,.34,.055/(i+1),'sine',i*.012));n(.13,3800,.13,'bandpass');return;}

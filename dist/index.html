@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101719"><title>Armature — Move to play</title><meta name="description" content="Step into your motion-powered arcade. Connect your arm, calibrate your avatar, and move to play."><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="style.css?v=demo-pass4"><link rel="stylesheet" href="lobby.css?v=demo-pass4"><script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101719"><title>Armature — Move to play</title><meta name="description" content="Step into your motion-powered arcade. Connect your arm, calibrate your avatar, and move to play."><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="style.css?v=spell-pass3"><link rel="stylesheet" href="lobby.css?v=spell-pass3"><script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script></head>
 <body class="game-shell"><main id="viewport" tabindex="-1" aria-label="Armature game world">
 <div class="lobby-shade"></div>
 <header class="lobby-header"><a class="brand" href="./"><span class="mark">A</span> ARMATURE</a><div class="connection-status"><i></i><span id="connection">Arm offline</span></div></header>
@@ -8,7 +8,7 @@
 <button id="playGame" class="play-button"><span>PLAY</span><span aria-hidden="true">↗</span></button><p id="lobbyNotice" role="status"></p>
 <nav id="gamePicker" class="game-carousel" aria-label="Choose a game">
 <button id="previousGame" aria-label="Previous game" aria-controls="gameChoice"><span aria-hidden="true">‹</span></button>
-<div id="gameChoice" class="game-choice" aria-live="polite" aria-atomic="true"><h1 id="selectedGameName">Zombie Boxing</h1><div><span id="selectedGameNumber">01 / 06</span></div></div>
+<div id="gameChoice" class="game-choice" aria-live="polite" aria-atomic="true"><h1 id="selectedGameName">Zombie Boxing</h1><div><span id="selectedGameNumber">01 / 07</span></div></div>
 <button id="nextGame" aria-label="Next game" aria-controls="gameChoice"><span aria-hidden="true">›</span></button>
 </nav>
 <div class="session-targets"><label>TIME TARGET<select id="workoutGoal"><option value="5">5 min</option><option value="10" selected>10 min</option><option value="20">20 min</option><option value="30">30 min</option></select></label><label>CALORIE TARGET<select id="calorieGoal"><option value="25">25 kcal</option><option value="50" selected>50 kcal</option><option value="100">100 kcal</option><option value="200">200 kcal</option></select></label></div>
@@ -34,4 +34,4 @@
 </div>
 </main>
 <dialog id="setupDialog" aria-label="Connect your arm"><div class="dialog-heading"><span>CONNECT YOUR ARM</span><button id="closeSetup" aria-label="Close arm connection">✕</button></div><aside><p>Power on your ESP32, then choose it from your browser’s Bluetooth list.</p><button id="connect" class="primary">Find ESP32 ↗</button><button id="connectInSetup" hidden>Connect ESP32</button><p id="message" role="status"></p><div class="sensors"><div><i class="sensor-dot upper"></i><span>Upper arm<small>MPU6050 · 0x68</small></span><b id="upperState">Offline</b></div><div><i class="sensor-dot lower"></i><span>Forearm<small>MPU6050 · 0x69</small></span><b id="lowerState">Offline</b></div></div><details><summary>Fit & diagnostics</summary><p id="mode">PREVIEW</p><div class="dimensions"><label>Upper arm <div><input id="upperLength" type="number" min="15" max="50" value="30"> cm</div></label><label>Forearm <div><input id="lowerLength" type="number" min="15" max="45" value="26"> cm</div></label></div><div class="metrics"><div><span>Elbow</span><strong id="angle">0°</strong></div><div><span>Rate</span><strong id="rate">—</strong></div><div><span>Packet age</span><strong id="age">—</strong></div><div><span>Lost</span><strong id="lost">—</strong></div></div></details><a class="guide" href="guide.html">Wiring, firmware & Bluetooth setup ↗</a></aside></dialog>
-<script type="module" src="app.js?v=demo-pass4"></script></body></html>
+<script type="module" src="app.js?v=spell-pass3"></script></body></html>

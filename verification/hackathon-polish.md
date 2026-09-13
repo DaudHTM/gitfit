@@ -21,10 +21,24 @@ The active goal is to improve UI, functionality, latency, sound, animation, dyna
 - Node: 54 tests and 18 source syntax checks passed. Coverage includes duel timing/contact/recovery, damage variety, graphics adaptation, unchanged text writes, action sound envelopes and local asset completeness, alongside the existing tracking/calibration/flight tests.
 - Browser: Round and Graphics preferences survived reload; the preview was restored to Quick / Auto, connected-arm input and the normal viewport.
 
+## Spell Rush and sensor-sweep pass
+
+- Added a seventh game, Spell Rush: jab / hook / uppercut cast Firebolt / Arc / Rise. Readable front-ward prompts teach all three; later enemies require two different gestures. Every fifth defeat enables a six-second double-points phase. Wrong spells deflect, missed wards cost health, and results report matches, defeated wards and best chain.
+- Added a crystal-portal environment, animated rune enemies, a hand rune, twelve reusable curved spell trails, gesture-colored pooled impact effects, four sound cues and a seventh original music theme. The lobby stays a single-game carousel. Practice 1 / 2 / 3 shortcuts and Cast use the same trajectory classifier; live input and calorie rules are unchanged.
+- Sword and saber collision checks reconstruct actual blades at intermediate sensor poses. They consume at most twelve samples from the latest 100 ms, reject duplicate timestamps, and prevent stale backlog jumps from becoming strikes. Displayed arm pose remains immediate. Reconstructed geometry matches the rendered quaternion grip in tests.
+- Fixed saber’s late “CUT NOW” cue and practice animation that swung away from the blocks. The cue now leads the strike plane and the animation crosses the blocks before recovering; tests cover all six block positions and 0–120 ms cue response delays.
+- Fixed conflicting 60-second versus 45-second HUD timers in quick rounds, retained the selected practice gesture/effort throughout each animation, cleared stale wrist readouts on new rounds, and made lost health visible as empty pips.
+
+### Verification
+
+- 62 Node tests and 20 JavaScript syntax checks passed; no diff whitespace errors.
+- Browser sword: Guard earned 25, a fresh counter earned 200, full health remained. This validates the new sample-history integration in practice; intermediate physical sensor traces are covered by deterministic tests.
+- Browser saber: followed the visible cue for three consecutive hits, scoring 330 / 3× with full health.
+- Browser Spell Rush: verified all three keyboard shortcuts, multi-stage wards, overdrive, pause/resume and a complete 45-second round. Result: 8,475 points, 18 defeated wards, 100% matched casts, best chain 34. Practice added no calories. Rendering read 60 FPS / 18 ms frame intervals during play; no console errors.
+- Physical IMU motion and end-to-end latency have not been measured. No firmware change or hardware flashing occurred in this pass.
+
 ## Continuing work
 
-- Add a distinct new game that demonstrates arm gestures quickly, with the same live/practice separation and fitness accounting.
-- Extend sword collision analysis to all recent sensor samples, while bounding work and avoiding stale-sample actions.
 - Further improve short-round results, game-specific challenges and readability; preserve the minimal lobby.
 - Profile sustained play and allocation/resource behavior across every game; validate physical end-to-end latency and wearable parry feel when hardware input is available.
 

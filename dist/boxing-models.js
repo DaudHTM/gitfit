@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {BOXING_STOP_Z} from './game-logic.js?v=demo-pass4';
+import {BOXING_STOP_Z} from './game-logic.js?v=spell-pass3';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.
 export function createBoxingModels(scene) {

@@ -119,3 +119,12 @@ export function practiceStroke(seconds,type='jab',effort=2){
 export function gripQuaternion([x,y,z,w]){
  const s=Math.SQRT1_2;return [s*(x-w),s*(y-z),s*(z+y),s*(w+x)];
 }
+
+export const SABER_CUE_START_Z=-1.95;
+export function saberPracticeRoll(seconds){
+ const ease=t=>t*t*(3-2*t);
+ if(seconds<0||seconds>=.76)return -.6;
+ if(seconds<.45)return -.6+1.2*ease(seconds/.45);
+ if(seconds<.5)return .6;
+ return .6-1.2*ease((seconds-.5)/.26);
+}

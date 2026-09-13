@@ -31,8 +31,8 @@ function audioFixture(){
  return {sound,get ctx(){return context;},callbacks};
 }
 
-test('all six scores have bounded musical notes and quiet, drum-free lobby arrangements',()=>{
- assert.equal(Object.keys(MUSIC_THEMES).length,6);
+test('all seven scores have bounded musical notes and quiet, drum-free lobby arrangements',()=>{
+ assert.equal(Object.keys(MUSIC_THEMES).length,7);
  for(const mode of Object.keys(MUSIC_THEMES))for(let step=0;step<256;step++){
   const notes=musicEvents(mode,step,true,.9);assert.ok(notes.length<12);
   for(const note of notes){assert.ok(note.gain>0&&note.gain<=.25);if(note.kind==='note'){assert.ok(note.frequency>30&&note.frequency<5000);assert.ok(note.duration>0&&note.duration<4);}}
@@ -62,5 +62,5 @@ test('mute, independent sliders, scene changes, and long scheduling gaps do not 
 
 test('all action cues construct finite, bounded envelopes',async()=>{
  const f=audioFixture();f.sound.unlock();await Promise.resolve();
- for(const kind of ['punch','knockout','armor','slash','slashSwing','block','hurt','miss','flap','step','growl','target','ring','bell','beat','finish','defeat','select','warning','parry','riposte']){f.sound.play(kind,{power:1.6,pan:-.7});assert.ok(f.sound.status.voices>0);f.ctx.advance(2);assert.equal(f.sound.status.voices,0);}
+ for(const kind of ['punch','knockout','armor','slash','slashSwing','block','hurt','miss','flap','step','growl','target','ring','bell','beat','finish','defeat','select','warning','parry','riposte','firebolt','arcSpell','riseSpell','spellDeflect']){f.sound.play(kind,{power:1.6,pan:-.7});assert.ok(f.sound.status.voices>0);f.ctx.advance(2);assert.equal(f.sound.status.voices,0);}
 });
