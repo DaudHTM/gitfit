@@ -145,6 +145,3 @@ Bird Flight uses only vertical downstroke strength for lift. Harder flaps rise m
 
 Play enters the game and requests fullscreen automatically. Use Fullscreen in the bottom-right to toggle it again, or Lobby to return to your avatar. Exit, pause/resume and practice strike/flap controls stay inside the fullscreen view. When native fullscreen is unavailable or stalls in an embedded browser, the game immediately expands to fill the page instead. Escape exits this expanded fallback and pauses. The less-sensitive calibration update requires uploading the current ArmTracker sketch again. This firmware change relaxes pose stability and skips brief outliers; sensing, fusion, notification rates and the BLE packet format are unchanged.
 
-## Short hackathon demonstration
-
-Keep Round set to Quick (45 seconds). Connect the arm and complete both calibration poses before the presentation. Boxing demonstrates different enemy builds, automatic turns and speed-based damage. Flight waits for your first flap, while Orbit Guard demonstrates accurate blocks and a larger shield after four perfect catches. Use Play again or Next game between demonstrations; Bluetooth stays connected. Practice is visibly labeled and never counts calories. Engine, fonts and music use local assets.
