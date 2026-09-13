@@ -26,7 +26,7 @@ int main(){
  for(int i=0;i<600;i++){float a[3]={noise(generator),noise(generator),1+noise(generator)};float g[3]={.12f+noise(generator),noise(generator),noise(generator)};stationary.add(a,g);assert(stationary.check(a,g)==0);}
  assert(stationary.gyroM2[0]/599>.0001f); // This realistic noise failed the former threshold.
  assert(fabsf(stationary.gyroMean[0]-.12f)<.01f);
- float a[3]={0,0,1},fast[3]={.7f,0,0};assert(stationary.check(a,fast)==1);
+ float a[3]={0,0,1},fast[3]={1.0f,0,0};assert(stationary.check(a,fast)==1);
  // Small 8 Hz tremor is accepted while the mean pose and gyro bias remain accurate.
  PoseWindow tremor;
  for(int i=0;i<600;i++){
@@ -36,14 +36,29 @@ int main(){
  }
  assert(fabsf(tremor.accMean[0])<.001f&&fabsf(tremor.accMean[1])<.001f);
  assert(fabsf(tremor.gyroMean[0]-.12f)<.001f);
+ // A larger, zero-mean wobble now passes without corrupting the averaged pose.
+ PoseWindow relaxed;
+ for(int i=0;i<600;i++){
+  float wave=sinf(i*2*3.1415926535f*6/200),cosine=cosf(i*2*3.1415926535f*6/200);
+  float b[3]={.18f*wave,.10f*cosine,1+.03f*wave},g[3]={.12f+.25f*wave,.16f*cosine,.06f*wave};
+  relaxed.add(b,g);assert(relaxed.check(b,g)==0);
+ }
+ assert(fabsf(relaxed.accMean[0])<.001f&&fabsf(relaxed.gyroMean[0]-.12f)<.001f);
+ PoseStabilityGate gate;
+ for(int burst=0;burst<5;burst++){for(int i=0;i<12;i++)assert(!gate.restart(1));assert(!gate.restart(0));}
+ for(int i=0;i<29;i++)assert(!gate.restart(4));assert(gate.restart(4));
+ assert(!gate.restart(0));assert(gate.rejectedSamples==0);
  PoseWindow unstable;unsigned reason=0;
- for(int i=0;i<50;i++){float g[3]={i%2?.2f:-.2f,0,0};unstable.add(a,g);reason=unstable.check(a,g);}
+ for(int i=0;i<150;i++){float g[3]={i%2?.35f:-.35f,0,0};unstable.add(a,g);reason=unstable.check(a,g);}
  assert(reason==2);
+ PoseWindow rotating;
+ for(int i=0;i<150;i++){float g[3]={.55f,0,0};rotating.add(a,g);reason=rotating.check(a,g);}
+ assert(reason==1);
  PoseWindow shaking;
- for(int i=0;i<50;i++){float b[3]={i%2?.15f:-.15f,0,1},g[3]={0,0,0};shaking.add(b,g);reason=shaking.check(b,g);}
+ for(int i=0;i<150;i++){float b[3]={i%2?.22f:-.22f,0,1},g[3]={0,0,0};shaking.add(b,g);reason=shaking.check(b,g);}
  assert(reason==3);
  float invalid[3]={0,0,0},zero[3]={0,0,0};assert(stationary.check(invalid,zero)==4);
- std::cout<<"Passed stationary noise, small-tremor acceptance, bias averaging, and large-movement rejection.\n";
+ std::cout<<"Passed stationary noise, relaxed tremor tolerance, brief-bump grace, bias averaging, and sustained-movement rejection.\n";
  Q result;assert(!frameFromPoses({0,0,1},{0,0,1},result));assert(!frameFromPoses({0,0,1},{0,0,-1},result));assert(!frameFromPoses({0,0,0},{1,0,0},result));
  std::cout<<"Passed 2000 arbitrary sensor mounts, T-pose initialization, and degenerate-pose rejection.\n";
 }

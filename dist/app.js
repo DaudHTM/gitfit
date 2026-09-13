@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createArcade} from './game.js?v=immersion2';
+import {createArcade} from './game.js?v=controls-fix3';
 import {SERVICE,DATA,CONTROL,decode,sequenceGap,calibrationView} from './protocol.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#162023');$('viewport').prepend(renderer.domElement);
@@ -12,7 +12,7 @@ function renderCalibration(flags,progress=0,reason=0){
  const showPose=!v.ready&&!(flags&4)&&(calibrationMode||!!(flags&128));
  $('poseInstructions').hidden=!showPose;
  $('calTitle').textContent=showPose?v.title:'';
- $('calInstructions').textContent=!showPose?'':v.step===2?'Right arm sideways at shoulder height, elbow straight, palm down. Hold for 3 seconds.':'Right arm at your side, palm toward your thigh. Hold for 3 seconds.';
+ $('calInstructions').textContent=!showPose?'':v.step===2?'Right arm sideways at shoulder height, elbow straight, palm down. Hold comfortably for 3 seconds.':'Right arm at your side, palm toward your thigh. Hold comfortably for 3 seconds.';
  $('calibrate').textContent=showPose||v.ready?v.button:'Calibrate';$('calibrate').disabled=v.disabled;
  const needsStatus=flags&&(calPending||v.capturing||reason||!!(flags&76)||!(flags&128));
  $('calStatus').textContent=needsStatus?v.status:'';

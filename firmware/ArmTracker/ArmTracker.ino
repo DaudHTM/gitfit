@@ -58,13 +58,22 @@ struct PoseWindow {
  // 1 rotation, 2 gyro instability, 3 acceleration instability, 4 invalid acceleration.
  unsigned check(const float a[3],const float g[3]) const {
   float norm=sqrtf(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
-  if(norm<.7f||norm>1.3f)return 4;
-  for(int j=0;j<3;j++)if(fabsf(g[j])>.65f)return 1;
-  if(count>=40)for(int j=0;j<3;j++){
-   if(gyroM2[j]/(count-1)>.01f)return 2; // stddev 0.10 rad/s: allow small natural hand tremor
-   if(accM2[j]/(count-1)>.01f)return 3; // stddev 0.10 g; average gentle shaking across the capture
+  if(norm<.65f||norm>1.35f)return 4;
+  for(int j=0;j<3;j++)if(fabsf(g[j])>.95f)return 1;
+  if(count>=100)for(int j=0;j<3;j++){
+   if(fabsf(gyroMean[j])>.4f)return 1; // Reject sustained rotation, even if its speed is steady.
+   if(gyroM2[j]/(count-1)>.04f)return 2; // stddev 0.20 rad/s: average natural hand tremor
+   if(accM2[j]/(count-1)>.0225f)return 3; // stddev 0.15 g: tolerate gentle pose wobble
   }
   return 0;
+ }
+};
+// Brief bumps pause sample collection instead of discarding the whole capture.
+struct PoseStabilityGate {
+ unsigned rejectedSamples=0;
+ bool restart(unsigned reason){
+  if(!reason){rejectedSamples=0;return false;}
+  return ++rejectedSamples>=30; // 150 ms of sustained movement at 200 Hz
  }
 };
 // END POSE STABILITY
@@ -86,6 +95,8 @@ uint16_t samples=0,sequence=0;
 uint32_t calibrationStart=0,windowStart=0,lastResetAt=0;
 uint8_t resetReason=0;
 constexpr uint32_t POSE_HOLD_MS=3000;
+constexpr unsigned POSE_SAMPLES=600;
+PoseStabilityGate stabilityGate;
 bool regWrite(uint8_t addr,uint8_t reg,uint8_t value){Wire.beginTransmission(addr);Wire.write(reg);Wire.write(value);return Wire.endTransmission()==0;}
 bool readRegs(uint8_t addr,uint8_t reg,uint8_t* out,size_t n){Wire.beginTransmission(addr);Wire.write(reg);if(Wire.endTransmission(false)!=0)return false;if(Wire.requestFrom(addr,n,true)!=n)return false;for(size_t i=0;i<n;i++)out[i]=Wire.read();return true;}
 bool initImu(Imu &s){
@@ -102,7 +113,7 @@ void fuse(Imu &s,float dt){float gx=s.g[0]-s.bias[0],gy=s.g[1]-s.bias[1],gz=s.g[
  if(n>.85f&&n<1.15f){float ax=s.a[0]/n,ay=s.a[1]/n,az=s.a[2]/n;float vx=2*(q.x*q.z-q.w*q.y),vy=2*(q.w*q.x+q.y*q.z),vz=1-2*(q.x*q.x+q.y*q.y);constexpr float kp=1.5f;gx+=kp*(ay*vz-az*vy);gy+=kp*(az*vx-ax*vz);gz+=kp*(ax*vy-ay*vx);}
  Q dq=mul(q,{0,gx,gy,gz});s.q=normalize({q.w+.5f*dq.w*dt,q.x+.5f*dq.x*dt,q.y+.5f*dq.y*dt,q.z+.5f*dq.z*dt});}
 void clearPoseWindow(){
- samples=0;windowStart=millis();
+ samples=0;windowStart=millis();stabilityGate=PoseStabilityGate{};
  for(auto &s:imus)s.pose=PoseWindow{};
 }
 void restartPoseWindow(uint8_t reason){
@@ -125,18 +136,21 @@ void rejectPose(bool geometry){
 }
 void calibrationSample(){
  if(uint32_t(millis()-calibrationStart)>20000){rejectPose(false);return;}
- // Evaluate noise continuously rather than rejecting only at 99%.
+ // Skip isolated bad samples from either sensor; only sustained movement resets.
+ uint8_t bad=0;
  for(int i=0;i<2;i++){
   auto &s=imus[i];unsigned reason=s.pose.check(s.a,s.g);
-  if(reason){restartPoseWindow(uint8_t(i*4+reason));return;}
+  if(reason){bad=uint8_t(i*4+reason);break;}
  }
+ if(bad){if(stabilityGate.restart(bad))restartPoseWindow(bad);return;}
+ stabilityGate.restart(0);
+ for(auto &s:imus)s.pose.add(s.a,s.g);
  samples++;
- for(int i=0;i<2;i++){
-  auto &s=imus[i];s.pose.add(s.a,s.g);
-  unsigned reason=s.pose.check(s.a,s.g);
-  if(reason){restartPoseWindow(uint8_t(i*4+reason));return;}
+ if(uint32_t(millis()-windowStart)<POSE_HOLD_MS||samples<POSE_SAMPLES)return;
+ // Include the final sample in the stability decision before accepting a pose.
+ for(int i=0;i<2;i++)if(unsigned reason=imus[i].pose.check(imus[i].a,imus[i].g)){
+  restartPoseWindow(uint8_t(i*4+reason));return;
  }
- if(uint32_t(millis()-windowStart)<POSE_HOLD_MS||samples<200)return;
  if(calibrationStage==1){
   for(auto &s:imus)for(int j=0;j<3;j++){s.downMean[j]=s.pose.accMean[j];s.downBias[j]=s.pose.gyroMean[j];}
   calibrationStage=2;calibrating=false;samples=0;resetReason=0;Serial.println("Arm-down captured. Extend right arm sideways, palm down, then capture T-pose.");return;
@@ -159,7 +173,7 @@ class ServerCallbacks:public NimBLEServerCallbacks{void onConnect(NimBLEServer* 
 class ControlCallbacks:public NimBLECharacteristicCallbacks{void onWrite(NimBLECharacteristic* c,NimBLEConnInfo&)override{auto v=c->getValue();if(v.size()==1&&uint8_t(v[0])>=1&&uint8_t(v[0])<=3)requestCalibration.store(uint8_t(v[0]));}} controlCallbacks;
 void sendPacket(){uint8_t b[20]={};b[0]=sequence&255;b[1]=sequence>>8;sequence++;b[2]=128|(calibrated?1:0)|(calibrating?2:0)|(fault?4:0)|(rejected?8:0)|(calibrationStage>=2?16:0)|(calibrationStage==3?32:0)|(poseError?64:0);
  uint32_t progress=(millis()-windowStart)*100/POSE_HOLD_MS;
- uint32_t sampleProgress=uint32_t(samples)*100/200;
+ uint32_t sampleProgress=uint32_t(samples)*100/POSE_SAMPLES;
  if(sampleProgress<progress)progress=sampleProgress;
  b[3]=calibrating?uint8_t(progress>99?99:progress):(calibrated||calibrationStage==2?100:0);
  if(resetReason&&((calibrating&&uint32_t(millis()-lastResetAt)<1000)||(rejected&&!poseError)))b[3]=128+resetReason;
@@ -183,4 +197,3 @@ void loop(){
  if(fault){calibrated=false;calibrating=false;calibrationStage=0;}else if(calibrating){calibrationSample();}else if(calibrated){if(dt>.025f){calibrated=false;}else for(auto &s:imus)fuse(s,dt);}
  if(uint32_t(now-sent)>=10000){sent=now;if(server->getConnectedCount())sendPacket();}
 }
-

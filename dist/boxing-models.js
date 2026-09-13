@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {BOXING_STOP_Z} from './game-logic.js?v=controls-fix3';
 
 // Shared geometry keeps the articulated fighters inexpensive to draw and recycle.
 export function createBoxingModels(scene) {
@@ -66,7 +67,7 @@ export function createBoxingModels(scene) {
   return {root,body,head,chest,jaw,legs,arms,health,shirt,hp:2,attack:0,flash:0,dead:0,index,step:0};
  }
  function animate(e,time,dt){
-  const near=e.root.position.z>-.75,gait=time*(near?2:5.5)+e.index*1.7;
+  const near=e.root.position.z>BOXING_STOP_Z-.07,gait=time*(near?2:5.5)+e.index*1.7;
   const windup=T.MathUtils.smoothstep(e.attack,1.4,2.05),jab=T.MathUtils.smoothstep(e.attack,2.05,2.28);
   e.root.position.y=Math.abs(Math.sin(gait))*(near?.007:.024);
   e.chest.rotation.z=Math.sin(gait)*.035+e.flash*(e.hitSide||.3)*.6;
@@ -89,5 +90,10 @@ export function createBoxingModels(scene) {
  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;const ctx=canvas.getContext('2d');ctx.fillStyle='#172029';ctx.fillRect(0,0,1024,512);ctx.textAlign='center';ctx.fillStyle='#d5c0a1';ctx.font='700 100px sans-serif';ctx.fillText('DEAD AHEAD',512,235);ctx.font='28px sans-serif';ctx.fillStyle='#88999e';ctx.fillText('ARMATURE   /   SURVIVE THE ROUND',512,305);
  const sign=new T.Mesh(new T.PlaneGeometry(4.2,2.1),new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas)}));sign.position.set(0,2.5,-9);environment.add(sign);
  const key=new T.PointLight('#ffce9e',11,11,2);key.position.set(-1.5,3.3,1);environment.add(key);const rim=new T.PointLight('#74bcdf',18,15,2);rim.position.set(1.8,3,-4);environment.add(rim);
- return {glove,fighter,animate,environment};
+ function hitVolumes(e){
+  e.root.updateMatrixWorld(true);
+  const capsule=(node,a,b,radius)=>({a:node.localToWorld(new T.Vector3(...a)).toArray(),b:node.localToWorld(new T.Vector3(...b)).toArray(),radius});
+  return [capsule(e.chest,[0,.04,.02],[0,.19,.02],.235),capsule(e.head,[0,-.06,.025],[0,.095,.015],.15)];
+ }
+ return {glove,fighter,animate,hitVolumes,environment};
 }

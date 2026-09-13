@@ -10,10 +10,25 @@ test('a consumed stroke can only damage once, then rest rearms it',()=>{const p=
 test('reconnect gap cannot turn a position jump into a strike',()=>{const p=new TrajectoryPunchTracker();p.sample([0,1,0],0);assert.equal(p.sample([0,1,-1],800),null);});
 test('faster estimated speed gives more damage, bounded and health never negative',()=>{assert.ok(damageFromSpeed(3)>damageFromSpeed(1));assert.equal(damageFromSpeed(100),damageFromSpeed(4));assert.equal(damageFromSpeed(NaN),0);const z={hp:40};assert.equal(strike(z,damageFromSpeed(3)),true);assert.equal(z.hp,0);});
 test('all three practice animations are detected by the same trajectory classifier',()=>{for(const type of Object.keys(paths)){const tracker=new TrajectoryPunchTracker();let event;for(let i=0;i<70;i++){const time=i*10,s=practiceStroke(time/1000,type,2);if(s.phase!=='strike'){tracker.reset();tracker.sample(s.p,time);}else{const next=tracker.sample(s.p,time);if(next)event=next;}}assert.equal(event?.type,type);}});
-function flap(speed,side=0){const f=new FlapTracker(),sum={lift:0,thrust:0,side:0};for(let i=0;i<=20;i++){const e=f.sample([side*i*.01,1.6-speed*i*.01,-.3],i*10);if(e)for(const k of Object.keys(sum))sum[k]+=e[k];}return sum;}
-test('stronger downstrokes produce more lift and thrust',()=>{const easy=flap(1),hard=flap(2);assert.ok(hard.lift>easy.lift*2);assert.ok(hard.thrust>easy.thrust*2);});
-test('upstrokes do not propel and opposing diagonal flaps steer opposite ways',()=>{assert.equal(flap(-1).lift,0);assert.ok(flap(1,-1).side>0);assert.ok(flap(1,1).side<0);});
-test('flight coasts and descends without flaps; impulses lift and accelerate',()=>{const a=new FlightDynamics(),b=new FlightDynamics();b.impulse({...flap(2),strength:2});for(let i=0;i<30;i++){a.step(.01);b.step(.01);}assert.ok(b.y>a.y);assert.ok(b.speed>a.speed);assert.ok(a.y<2.2);});
+function flap(speed,side=0){const f=new FlapTracker(),sum={lift:0};for(let i=0;i<=20;i++){const e=f.sample([side*i*.01,1.6-speed*i*.01,-.3],i*10);if(e)sum.lift+=e.lift;}return sum;}
+test('stronger downstrokes produce more lift',()=>{const easy=flap(1),hard=flap(2);assert.ok(hard.lift>easy.lift*2);});
+test('upstrokes do not propel and lateral flaps cannot steer',()=>{assert.equal(flap(-1).lift,0);assert.equal(flap(1,-1).lift,flap(1,1).lift);const f=new FlightDynamics();f.impulse({lift:1,side:10,thrust:100,strength:1});for(let i=0;i<30;i++)f.step(.01);assert.equal(f.x,0);assert.equal(f.vx,0);assert.equal(f.speed,4);});
+test('flight falls without flaps; downstrokes lift at constant forward speed',()=>{const a=new FlightDynamics(),b=new FlightDynamics();b.impulse({...flap(2),started:true,strength:2});for(let i=0;i<30;i++){a.step(.01);b.step(.01);}assert.ok(b.y>a.y);assert.equal(b.speed,a.speed);assert.ok(a.y<2.6);});
+test('short retractions rearm live punches without returning to the original guard',()=>{
+ const tracker=new TrajectoryPunchTracker();let time=0,hits=0,recoveryHits=0;
+ const leg=(from,to,n,recovery=false)=>{for(let i=1;i<=n;i++){const e=tracker.sample([.23,1.28,from+(to-from)*i/n],time+=10);if(e){if(recovery)recoveryHits++;else{hits++;tracker.consume();}}}};
+ tracker.sample([.23,1.28,-.12],time);leg(-.12,-.43,20);leg(-.43,-.28,20,true);leg(-.28,-.55,20);leg(-.55,-.36,20,true);leg(-.36,-.63,20);
+ assert.equal(hits,3);assert.equal(recoveryHits,0);
+ for(let i=0;i<100;i++)assert.equal(tracker.sample([.23,1.28,-.63],time+=10),null);
+});
+test('a missed stroke also rearms on recovery, and initial classification retains its path',()=>{
+ const tracker=new TrajectoryPunchTracker();let time=0,first,id1,id2;
+ for(let i=0;i<=20;i++){const e=tracker.sample([.23,1.28,-.12-i*.015],time+=10);if(e){first??=e;id1=e.id;}}
+ assert.ok(first.path.length>2);assert.ok(first.path[0][2]>first.a[2]);
+ for(let i=1;i<=20;i++)assert.equal(tracker.sample([.23,1.28,-.42+i*.008],time+=10),null);
+ for(let i=1;i<=20;i++){const e=tracker.sample([.23,1.28,-.26-i*.015],time+=10);if(e)id2=e.id;}
+ assert.ok(id2>id1);
+});
 import {gripQuaternion} from '../dist/motion.js';
 test('blade remains perpendicular to the forearm for arbitrary wrist orientations',()=>{
  const rotate=(v,q)=>{const [x,y,z,w]=q,[vx,vy,vz]=v;const tx=2*(y*vz-z*vy),ty=2*(z*vx-x*vz),tz=2*(x*vy-y*vx);return [vx+w*tx+y*tz-z*ty,vy+w*ty+z*tx-x*tz,vz+w*tz+x*ty-y*tx];};

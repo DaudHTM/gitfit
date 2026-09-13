@@ -1,14 +1,14 @@
 import * as T from 'three';
-import {sweptHit,strike,nextOpponent,punchExtension} from './game-logic.js';
+import {sweptHit,strike,nextOpponent,punchExtension,punchHitsBody,BOXING_STOP_Z} from './game-logic.js?v=controls-fix3';
 import {ActivityTracker} from './activity.js';
-import {createSound} from './sound.js?v=immersion2';
+import {createSound} from './sound.js?v=controls-fix3';
 import {createImpactEffects} from './impact-effects.js';
-import {GAMES,createExtraGames} from './extra-games.js?v=immersion2';
-import {TrajectoryPunchTracker,practiceStroke} from './motion.js';
+import {GAMES,createExtraGames} from './extra-games.js?v=controls-fix3';
+import {TrajectoryPunchTracker,practiceStroke} from './motion.js?v=controls-fix3';
 import {setupFullscreen} from './fullscreen.js';
 import {createWorldDetails} from './world-details.js';
 import {createAvatar,createLobbyAvatar} from './avatar.js?v=minimal';
-import {createBoxingModels} from './boxing-models.js?v=immersion2';
+import {createBoxingModels} from './boxing-models.js?v=controls-fix3';
 const $=id=>document.getElementById(id);
 const GAME_ORDER=['zombies','bird','saber','sword','shield','targets'];
 export function createArcade(renderer,getTracking){
@@ -70,7 +70,7 @@ export function createArcade(renderer,getTracking){
  function liveReady(){const t=getTracking();return t.connected&&t.last&&performance.now()-t.last<250&&(t.flags&1)&&!(t.flags&6)&&!t.calPending;}
  function ready(){return input==='practice'||liveReady()}
  function pause(reason=''){if(state!=='playing')return;state='paused';sound.stop();extra.suspend();action=false;detector.reset();overlay('Paused',reason,'Resume round');$('pauseGame').textContent='Resume';}
- function finish(quiet=false){sound.stop();if(!quiet)sound.play((mode==='zombies'?lives<=0:extraResult?.hp<=0)?'defeat':'finish');const score=extraResult?.score??(mode==='zombies'?kills*100:targetScore);best[mode]=Math.max(best[mode]||0,score);try{localStorage.setItem('armature-bests',JSON.stringify(best))}catch{}state='over';$('opponentHud').hidden=true;detector.reset();overlay(mode==='zombies'?'Run complete.':(extraResult?.hp<=0?'Run complete.':'Time’s up.'),mode==='zombies'?`${kills} zombies defeated · ${hits} hits landed · wave ${wave}`:`${hits} targets hit in 45 seconds.`, 'Play again');$('overlayText').textContent=`Score ${score} · Best ${best[mode]} · ${extraResult?extraResult.combo+' combo':hits+' hits'}. Session: ${activity.kcal.toFixed(1)} estimated kcal.`;$('pauseGame').disabled=true;}
+ function finish(quiet=false){sound.stop();if(!quiet)sound.play((mode==='zombies'?lives<=0:extraResult?.hp<=0)?'defeat':'finish');const score=extraResult?.score??(mode==='zombies'?kills*100:targetScore);best[mode]=Math.max(best[mode]||0,score);try{localStorage.setItem('armature-bests',JSON.stringify(best))}catch{}state='over';$('opponentHud').hidden=true;detector.reset();overlay(mode==='bird'?'Flight over.':mode==='zombies'?'Run complete.':(extraResult?.hp<=0?'Run complete.':'Time’s up.'),mode==='zombies'?`${kills} zombies defeated · ${hits} hits landed · wave ${wave}`:`${hits} targets hit in 45 seconds.`, 'Play again');$('overlayText').textContent=`Score ${score} · Best ${best[mode]} · ${extraResult?extraResult.combo+(mode==='bird'?' gaps':' combo'):hits+' hits'}. Session: ${activity.kcal.toFixed(1)} estimated kcal.`;$('pauseGame').disabled=true;}
  function start(){sound.unlock();if(!ready()){if(active){$('overlayText').textContent='Tracking is not ready. Return to the lobby to reconnect or calibrate.';return;}$('lobbyNotice').textContent=getTracking().connected?'Calibrate your arm before playing.':'Connect your arm, or choose Practice in Settings.';return;}active=true;document.body.classList.add('in-game','arcade-active');$('viewport').scrollTop=0;$('settings').open=false;$('gameHud').hidden=false;$('gameToolbar').hidden=false;fullscreen.enter();
  if(state!=='paused'){clear();elapsed=0;nextSpawn=2.5;kills=hits=targetScore=0;lives=5;wave=1;extra.reset(mode);extraResult=null;if(mode==='zombies')zombie(-2.1,0);else if(mode==='targets')practiceTarget();}
  detector.reset();practiceStart=-10000;extra.group.visible=!['zombies','targets'].includes(mode);state='playing';sound.setScene(mode,true,elapsed);$('viewport').focus({preventScroll:true});sound.play('bell');$('gameOverlay').hidden=true;$('pauseGame').disabled=false;$('pauseGame').textContent='Pause';}
@@ -89,9 +89,10 @@ export function createArcade(renderer,getTracking){
  function lobby(){if(state==='playing'||state==='paused')finish(true);fullscreen.exit();select(mode);$('playGame').focus();}
  $('backLobby').onclick=$('overlayLobby').onclick=lobby;
  $('pauseGame').onclick=()=>state==='playing'?pause():state==='paused'?start():null;
- $('gameInput').onchange=()=>{input=$('gameInput').value;select(mode);$('practicePunch').hidden=input!=='practice';$('inputHint').textContent=input==='practice'?(mode==='bird'?'Space to flap · arrows / drag aim the flap':mode==='shield'?'Arrow keys or drag in scene':'Space or Strike · simulated arm'):'Live right arm · calibrated ESP32 required';};
- function practicePunch(){if(input==='practice'&&state==='playing'&&practiceClock-practiceStart>.8){action=true;practiceStart=practiceClock;if(mode!=='bird')sound.play(['sword','saber'].includes(mode)?'slashSwing':'whoosh',{power:.5+Number($('strikeEffort').value)*.25,pan:.3});}}
+ $('gameInput').onchange=()=>{input=$('gameInput').value;select(mode);$('practicePunch').hidden=input!=='practice';$('inputHint').textContent=input==='practice'?(mode==='bird'?'Space or tap to flap · automatic forward movement':mode==='shield'?'Arrow keys or drag in scene':'Space or Strike · simulated arm'):'Live right arm · calibrated ESP32 required';};
+ function practicePunch(){if(input==='practice'&&state==='playing'&&practiceClock-practiceStart>(mode==='bird'?.23:.8)){action=true;practiceStart=practiceClock;if(mode!=='bird')sound.play(['sword','saber'].includes(mode)?'slashSwing':'whoosh',{power:.5+Number($('strikeEffort').value)*.25,pan:.3});}}
  $('practicePunch').onclick=practicePunch;
+ $('viewport').addEventListener('click',e=>{if(mode==='bird'&&e.target.tagName==='CANVAS')practicePunch();});
  window.addEventListener('keydown',e=>{if(e.code==='Escape')pause();if(e.code==='Space'&&!e.repeat&&active&&input==='practice'&&!/INPUT|SELECT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();practicePunch();}});
  document.addEventListener('visibilitychange',()=>{if(document.hidden){pause('The round paused while this tab was hidden.');sound.stop();}else if(!active)sound.setScene(mode,false);});
  function tick(now){const dt=lastFrame?Math.min((now-lastFrame)/1000,.05):0;lastFrame=now;world.tick(dt);
@@ -119,14 +120,14 @@ export function createArcade(renderer,getTracking){
   if(mode==='zombies'){
    wave=1+Math.floor(kills/5);if(elapsed>=nextSpawn&&enemies.filter(e=>!e.dead).length<4){zombie(-7,enemies.length+kills);nextSpawn=elapsed+Math.max(1.8,4.3-wave*.2);}
    const living=enemies.filter(e=>!e.dead).sort((a,b)=>b.root.position.z-a.root.position.z);
-   living.forEach((e,i)=>{const limit=i?living[i-1].root.position.z-.85:-.68;e.root.position.z=Math.min(limit,e.root.position.z+dt*(.55+Math.min(wave,8)*.06));const approach=T.MathUtils.smoothstep(-e.root.position.z,1,5);e.root.position.x=.16+Math.sin(e.index*2.4)*.8*approach+Math.sin(elapsed*2+e.index)*.02;
+   living.forEach((e,i)=>{const limit=i?living[i-1].root.position.z-.95:BOXING_STOP_Z;e.root.position.z=Math.min(limit,e.root.position.z+dt*(.55+Math.min(wave,8)*.06));const approach=T.MathUtils.smoothstep(-e.root.position.z,1,5);e.root.position.x=.16+Math.sin(e.index*2.4)*.8*approach+Math.sin(elapsed*2+e.index)*.02;
     e.flash=Math.max(0,e.flash-dt);boxing.animate(e,elapsed,dt);if(i===0&&e.attack>1.55&&!e.warned){sound.play('growl',{pan:e.root.position.x*.5});e.warned=true;}if(e.attack<.3)e.warned=false;
     if(i===0&&e.root.position.z<-1.1){const foot=Math.floor(elapsed*1.8);if(foot!==e.step){sound.play('step',{power:Math.max(.3,1+e.root.position.z/8),pan:e.root.position.x*.5});e.step=foot;}}
-    if(e.root.position.z>=-.70){e.attack+=dt;if(e.attack>2.3){lives--;combo=0;e.attack=0;feedback('TOO CLOSE −1',{kind:'hurt',point:new T.Vector3(0,1.45,-.3)});$('viewport').classList.add('hurt');setTimeout(()=>$('viewport').classList.remove('hurt'),220);if(lives<=0)finish();}}else e.attack=0;
+    if(e.root.position.z>=BOXING_STOP_Z-.02){e.attack+=dt;if(e.attack>2.3){lives--;combo=0;e.attack=0;feedback('TOO CLOSE −1',{kind:'hurt',point:new T.Vector3(0,1.45,-.3)});$('viewport').classList.add('hurt');setTimeout(()=>$('viewport').classList.remove('hurt'),220);if(lives<=0)finish();}}else e.attack=0;
    });
-   focus=nextOpponent(enemies);$('opponentHud').hidden=!focus||state!=='playing';$('opponentName').textContent=focus?'OPPONENT '+(kills+1):'CLEAR';$('opponentCue').textContent=focus?(focus.attack>1.4?'Incoming swing':focus.root.position.z>-.8?'In reach · punch':'Closing in'):'';document.querySelectorAll('.opponent-bars i').forEach((bar,i)=>{const fraction=focus?T.MathUtils.clamp(focus.hp/focus.maxHp*2-i,0,1):0;bar.style.background=`linear-gradient(to right,#f3ba80 ${fraction*100}%,#ffffff26 ${fraction*100}%)`;});
-   let landed=false;
-   for(const sweep of sweeps){if(landed||state!=='playing')break;for(const e of living){const center=e.root.position.clone().add(new T.Vector3(0,1.32,.08));if(sweptHit(sweep.a,sweep.b,center.toArray(),.32)){
+   focus=nextOpponent(enemies);$('opponentHud').hidden=!focus||state!=='playing';$('opponentName').textContent=focus?'OPPONENT '+(kills+1):'CLEAR';$('opponentCue').textContent=focus?(focus.attack>1.4?'Incoming swing':focus.root.position.z>-.95?'In reach · punch':'Closing in'):'';document.querySelectorAll('.opponent-bars i').forEach((bar,i)=>{const fraction=focus?T.MathUtils.clamp(focus.hp/focus.maxHp*2-i,0,1):0;bar.style.background=`linear-gradient(to right,#f3ba80 ${fraction*100}%,#ffffff26 ${fraction*100}%)`;});
+   let landed=false;const hitBodies=sweeps.length?living.map(e=>({e,capsules:boxing.hitVolumes(e)})):[];
+   for(const sweep of sweeps){if(landed||state!=='playing')break;for(const {e,capsules} of hitBodies){const center=new T.Vector3(...sweep.b);if(punchHitsBody(sweep,capsules)){
     detector.consume();landed=true;hits++;combo=elapsed-lastHit<4?combo+1:1;lastHit=elapsed;e.flash=.2+sweep.damage*.002;e.attack=0;const dead=strike(e,sweep.damage);e.health.forEach((h,i)=>{h.scale.x=.13*T.MathUtils.clamp(e.hp/e.maxHp*2-i,0,1);});const impactDirection=new T.Vector3().fromArray(sweep.b).sub(new T.Vector3().fromArray(sweep.a)).normalize();e.hitSide=impactDirection.x;e.hitLift=sweep.type==='uppercut'?1:0;
     $('strikeReadout').textContent=`${sweep.type.toUpperCase()} · ${sweep.peakSpeed.toFixed(1)} m/s est. · ${sweep.damage} damage`;
     if(dead){kills++;e.dead=.001;feedback(`${sweep.type.toUpperCase()} · KNOCKOUT +100`,{kind:'knockout',point:center,power:sweep.damage/65,direction:impactDirection});}else{e.root.position.z-=.10+sweep.damage*.0015;feedback(`${sweep.type.toUpperCase()} · −${sweep.damage} HP`,{kind:'punch',point:center,power:sweep.damage/65,direction:impactDirection});}break;
@@ -147,7 +148,7 @@ export function createArcade(renderer,getTracking){
  $('gameScore').textContent=mode==='zombies'?String(kills*100):String(targetScore);$('roundLabel').textContent=mode==='zombies'?'WAVE':'SECONDS';$('gameRound').textContent=mode==='zombies'?String(wave):String(Math.max(0,Math.ceil(45-elapsed)));$('healthLabel').textContent=mode==='zombies'?'HEALTH':'HITS';$('gameHealth').textContent=mode==='zombies'?'●'.repeat(Math.max(0,lives))+'○'.repeat(5-Math.max(0,lives)):String(hits);
  $('gameState').textContent=state==='playing'?(input==='live'?'LIVE ARM':'KEYBOARD / TOUCH'):state.toUpperCase();
  if(!extraResult&&!['zombies','targets'].includes(mode)){$('gameRound').textContent=mode==='sword'?'0':'60';$('roundLabel').textContent=mode==='sword'?'COMBO':'SECONDS';$('healthLabel').textContent='HEALTH';$('gameHealth').textContent='●●●●●';}
- if(extraResult){$('gameScore').textContent=extraResult.score;$('roundLabel').textContent=mode==='sword'?'COMBO':'SECONDS';$('gameRound').textContent=mode==='sword'?extraResult.combo:extraResult.seconds;$('healthLabel').textContent=mode==='bird'?'COMBO':'HEALTH';$('gameHealth').textContent=mode==='bird'?extraResult.combo+'×':'●'.repeat(Math.max(0,extraResult.hp));}
+ if(extraResult){$('gameScore').textContent=extraResult.score;$('roundLabel').textContent=mode==='bird'?'DISTANCE':mode==='sword'?'COMBO':'SECONDS';$('gameRound').textContent=mode==='bird'?extraResult.distance+' m':mode==='sword'?extraResult.combo:extraResult.seconds;$('healthLabel').textContent=mode==='bird'?'GAPS':'HEALTH';$('gameHealth').textContent=mode==='bird'?String(extraResult.combo):'●'.repeat(Math.max(0,extraResult.hp));}
  $('immersiveAction').hidden=input!=='practice';$('immersiveAction').disabled=state!=='playing';$('immersivePause').textContent=state==='paused'?'Resume':'Pause';$('immersivePause').disabled=!['playing','paused'].includes(state);
  $('gameDetail').textContent=extraResult?.detail||'';
  $('bestScore').textContent=best[mode]||0;
@@ -163,10 +164,10 @@ export function createArcade(renderer,getTracking){
  const birdPos=extraResult?.bird||new T.Vector3(0,2.2,-.5);
  const cp=mode==='bird'?(view==='shoulder'?new T.Vector3(birdPos.x,birdPos.y+.7,1.6):new T.Vector3(birdPos.x,birdPos.y+.04,.02)):view==='shoulder'?new T.Vector3(.28,1.8,.48):new T.Vector3(.03,1.60,.07);
  bodyParts.forEach(part=>part.visible=view==='shoulder');
- if(mode==='bird'){aim.set(birdPos.x+(extraResult?.bank||0)*.3,birdPos.y,-6);extra.setView(view==='shoulder');}
+ if(mode==='bird'){aim.set(0,birdPos.y,-6);extra.setView(view==='shoulder');}
  if(mode==='zombies'&&view==='director'&&motion&&focus){aim.set(focus.root.position.x*.55,1.34,Math.min(-1.7,focus.root.position.z));cp.x+=T.MathUtils.clamp(focus.root.position.x*.16,-.13,.13)+Math.sin(elapsed*.6)*.035;cp.y+=T.MathUtils.clamp((-focus.root.position.z-1)*.014,0,.07);}
- if(motion&&state==='playing'){cp.x+=Math.sin(now*.063)*shake*.45;cp.y+=Math.sin(elapsed*2)*.006+Math.cos(now*.047)*shake*.2;cp.z+=shake*.2;}
- camera.position.lerp(cp,1-Math.exp(-dt*7));cameraAim.lerp(aim,1-Math.exp(-dt*4));camera.lookAt(cameraAim);if(motion&&state==='playing')camera.rotateZ(mode==='bird'?T.MathUtils.clamp(-(extraResult?.bank||0)*.01,-.045,.045):Math.sin(now*.032)*shake*.23);
+ if(motion&&state==='playing'){if(mode!=='bird')cp.x+=Math.sin(now*.063)*shake*.45;cp.y+=Math.sin(elapsed*2)*.006+Math.cos(now*.047)*shake*.2;cp.z+=shake*.2;}
+ camera.position.lerp(cp,1-Math.exp(-dt*7));cameraAim.lerp(aim,1-Math.exp(-dt*4));camera.lookAt(cameraAim);if(motion&&state==='playing'&&mode!=='bird')camera.rotateZ(Math.sin(now*.032)*shake*.23);
  camera.fov=T.MathUtils.lerp(camera.fov,mode==='zombies'&&view==='director'&&motion?74+Math.min(3,shake*45):76+(motion?mode==='bird'?Math.min(7,Math.max(0,(extraResult?.speed||3)-3)*1.2):shake*30:0),1-Math.exp(-dt*5));
  const size=renderer.domElement.getBoundingClientRect();camera.aspect=size.width/size.height;camera.updateProjectionMatrix();strikeZone.scale.setScalar(1+($('impactEffects').checked?sound.pulse()*.065:0));impactFx.tick(dt,camera,{effects:$('impactEffects').checked,flight:mode==='bird',speed:extraResult?.speed||0,paused:state!=='playing'});renderer.render(scene,camera);return true;
  }

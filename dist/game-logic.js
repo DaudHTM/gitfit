@@ -1,5 +1,22 @@
 // World-space swept collision prevents a fast fist skipping through a target.
 export function sweptHit(a,b,c,r){const d=b.map((v,i)=>v-a[i]);const n=d.reduce((s,v)=>s+v*v,0);const t=n?Math.max(0,Math.min(1,c.reduce((s,v,i)=>s+(v-a[i])*d[i],0)/n)):0;return c.reduce((s,v,i)=>s+(a[i]+t*d[i]-v)**2,0)<=r*r;}
+export const BOXING_STOP_Z=-.78;
+export const GLOVE_RADIUS=.13;
+// Distance between two segments: a moving glove versus an animated body capsule.
+// Includes strokes beginning inside a collider, and fast strokes crossing it.
+export function sweptCapsuleHit(a,b,c,d,r){
+ const sub=(p,q)=>p.map((v,i)=>v-q[i]),dot=(p,q)=>p.reduce((s,v,i)=>s+v*q[i],0),clamp=v=>Math.max(0,Math.min(1,v));
+ const u=sub(b,a),v=sub(d,c),w=sub(a,c),aa=dot(u,u),bb=dot(u,v),cc=dot(v,v),dd=dot(u,w),ee=dot(v,w);let s=0,t=0;
+ if(aa<1e-10&&cc<1e-10)return dot(w,w)<=r*r;
+ if(aa<1e-10)t=clamp(ee/cc);
+ else if(cc<1e-10)s=clamp(-dd/aa);
+ else {const denom=aa*cc-bb*bb;s=denom>1e-10?clamp((bb*ee-cc*dd)/denom):0;t=(bb*s+ee)/cc;if(t<0){t=0;s=clamp(-dd/aa);}else if(t>1){t=1;s=clamp((bb-dd)/aa);}}
+ return w.reduce((sum,x,i)=>sum+(x+s*u[i]-t*v[i])**2,0)<=r*r;
+}
+export function punchHitsBody(sweep,capsules){
+ const path=sweep.path||[sweep.a,sweep.b];
+ return capsules.some(c=>path.some((p,i)=>i>0&&sweptCapsuleHit(path[i-1],p,c.a,c.b,c.radius+GLOVE_RADIUS)));
+}
 export class PunchTracker{
  constructor(){this.reset()}
  reset(){this.previous=null;this.time=0;this.active=false;this.used=false;this.farthest=0;this.origin=0;}
