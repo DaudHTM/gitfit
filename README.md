@@ -2,6 +2,14 @@
 
 Three.js viewer + ESP32 firmware, with BLE notifications and two-pose calibration with small-tremor tolerance. Open `dist/index.html` through a local web server (not file://), or use the hosted site. Settings includes an avatar motion preview without hardware. Full illustrated setup is in `dist/guide.html`.
 
+## Play online and deploy
+
+[Play GitFit](https://daudhtm.github.io/gitfit/) · [GitHub repository](https://github.com/DaudHTM/gitfit) · [Hardware setup guide](https://daudhtm.github.io/gitfit/guide.html)
+
+GitHub Pages serves the static `dist/` folder over HTTPS. Use Chrome to connect the ESP32, or choose practice controls to play without hardware. The hosted site asks for its own Bluetooth device permission; localhost permissions and saved preferences do not carry over.
+
+Every push to `main` runs the JavaScript checks, tests, and firmware-copy check, then publishes through `.github/workflows/pages.yml`. No package installation, backend, or build step is needed: Three.js and fonts are included locally. GitHub repository Settings → Pages must use **GitHub Actions** as its source. To retry a deployment, open Actions → Deploy GitFit to GitHub Pages → Run workflow. The site changes only after verification succeeds.
+
 ## Motion Arcade
 
 The home page has **Zombie Boxing**, **Bird Flight**, and **Orbit Guard**, with a live avatar in the lobby. Connection and calibration are shared across modes; switching games keeps the BLE connection. The two arm quaternions keep the same 20-byte packet layout. Updated flags and commands support two-pose calibration.
